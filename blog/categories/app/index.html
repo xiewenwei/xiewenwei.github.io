@@ -5,11 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>保护 Redis 的数据 - 程序人生</title>
+  <title>Category: app - 程序人生</title>
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Redis 是非常流行的 key-value 类型的 NOSQL 数据库，它的 value 数据类型丰富多样，适合解决很多对关系数据库来说棘手的问题。Redis 是内存数据库，也就是说它把所有的数据都放在内存中。众所周知，当前机器突然断电或者系统异常崩溃时，内存的数据会丢失的， &hellip;">
+  <meta name="description" content="Category: app">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/06/16/redis-data-protection/">
+  <link rel="canonical" href="http://xiewenwei.github.com/blog/categories/app/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
@@ -67,101 +67,36 @@
   <div id="main">
     <div id="content">
       <div>
-<article class="hentry" role="article">
+<article role="article">
   
   <header>
-    
-      <h1 class="entry-title">保护 Redis 的数据</h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-16T00:08:00+08:00" pubdate data-updated="true">2014-06-16</time>
-        
-         | <a href="#disqus_thread">Comments</a>
-        
-      </p>
+    <h1 class="entry-title">Category: app</h1>
     
   </header>
-
-
-<div class="entry-content"><p>Redis 是非常流行的 key-value 类型的 NOSQL 数据库，它的 value 数据类型丰富多样，适合解决很多对关系数据库来说棘手的问题。Redis 是内存数据库，也就是说它把所有的数据都放在内存中。众所周知，当前机器突然断电或者系统异常崩溃时，内存的数据会丢失的，所以如果把系统的关键数据放在 Redis 中必须做好保护措施。</p>
-
-<p>Redis 提供了两种持久化数据机制：</p>
-
-<p>一种是 RDB 机制。这种方式是把当前整个 Redis 内存数据快照写到磁盘上。优点是比较简单，恢复快速。缺点是代价比较昂贵，尤其当数据量很大时，会严重影响到 Redis（照成 Redis 停顿），而且会极度消耗磁盘 IO。</p>
-
-<p>另一种是 AppendOnly 机制。这种方式类似于 log，把数据操作命令全部存入 log 文件。优点是每段时间写入数据不是很大，可以设置很短的写入时间间隔（比如1秒钟）。缺点是 log 文件可能会远大于数据文件，通常会是数据文件大小的 3~5 倍，而且恢复的时间要远大于 RDB 方式的恢复时间。</p>
-
-<p>这两种机制各有优劣，不过它们是可以结合起来使用的。在实际使用过程，通常还结合 Redis 的 slave 功能，做到对 Redis 影响更小，保护更充分。具体的做法是对 Redis 建立 master 和 slave，在 master 上根本不使用任何持久化机制，只在 slave 上建立结合 RDB 和 AppendOnly 的持久化机制。</p>
-</div>
-
-
-  <footer>
-    <p class="meta">
-      
   
-
-<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
-
-      
-
-
-
-
-
+  <div id="blog-archives" class="category">
 
 
 
   
+  <h2>2013</h2>
 
-
-<time datetime="2014-06-16T00:08:00+08:00" pubdate data-updated="true">2014-06-16</time>
-      
-
-<span class="categories">
+<article>
   
-    <a class='category' href='/blog/categories/redis/'>redis</a>
-  
-</span>
+<h1><a href="/blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/">一种轻量的移动应用离线操作和数据同步策略</a></h1>
+<time datetime="2013-06-03T22:58:00+08:00" pubdate><span class='month'>Jun</span> <span class='day'>03</span> <span class='year'>2013</span></time>
+
+<footer>
+  <span class="categories">posted in <a class='category' href='/blog/categories/app/'>app</a>, <a class='category' href='/blog/categories/mobile/'>mobile</a></span>
+</footer>
 
 
-    </p>
-    
-      <div class="sharing">
-  
-  
-  
-</div>
-
-    
-    <p class="meta">
-      
-        <a class="basic-alignment left" href="/blog/2014/06/08/sharding-redis-instance/" title="Previous Post: 分割 Redis 实例">&laquo; 分割 Redis 实例</a>
-      
-      
-        <a class="basic-alignment right" href="/blog/2014/06/22/trap-in-mongodb/" title="Next Post: MongoDB 那些坑">MongoDB 那些坑 &raquo;</a>
-      
-    </p>
-  </footer>
 </article>
 
-  <section>
-    <h1>Comments</h1>
-    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 </div>
-  </section>
+
+  
+</article>
 
 </div>
 
@@ -217,10 +152,7 @@
       var disqus_shortname = 'bohe';
       
         
-        // var disqus_developer = 1;
-        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/06/16/redis-data-protection/';
-        var disqus_url = 'http://xiewenwei.github.com//blog/2014/06/16/redis-data-protection/';
-        var disqus_script = 'embed.js';
+        var disqus_script = 'count.js';
       
     (function () {
       var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;

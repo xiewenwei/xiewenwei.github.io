@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="MongoDB 是目前炙手可热的 NoSQL 数据库，它提供的一些特性如自动 failover 机制，自动 sharding，自由 schema 等等的确不错，大部分情况下性能也是很棒的。但是薄荷在深入使用 MongoDB 过程中，还是遇到不少问题，下面总结几个我们使用过程中遇到的坑。 &hellip;">
+  <meta name="description" content="MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。 MongoDB &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,7 +74,7 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a></h1>
+      <h1 class="entry-title"><a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a></h1>
     
     
       <p class="meta">
@@ -99,55 +99,55 @@
   </header>
 
 
-  <div class="entry-content"><p>MongoDB 是目前炙手可热的 NoSQL 数据库，它提供的一些特性如自动 failover 机制，自动 sharding，自由 schema 等等的确不错，大部分情况下性能也是很棒的。但是薄荷在深入使用 MongoDB 过程中，还是遇到不少问题，下面总结几个我们使用过程中遇到的坑。</p>
+  <div class="entry-content"><p>MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。</p>
 
 <h2>MongoDB 数据库级锁</h2>
 
 <p><strong><em>坑爹指数：5星（最高5星）</em></strong></p>
 
-<p>MongoDB的锁机制和一般关系数据库如 MySQL（InnoDB）, Oracle 有非常大的差异，InnoDB 和 Oracle 能提供到行级粒度的锁，另外也同时提供表级锁和库级锁，而 MongoDB 只能提供库级锁，没错就是库级锁。这意味着，当 MongoDB 一个写锁处于占用状态时，其它的读写操作都得干等。</p>
+<p>MongoDB的锁机制和一般关系数据库如 MySQL（InnoDB）, Oracle 有很大的差异，InnoDB 和 Oracle 能提供行级粒度锁，而 MongoDB 只能提供 <strong><em>库级粒度锁</em></strong>，这意味着当 MongoDB 一个写锁处于占用状态时，其它的读写操作都得干等。</p>
 
-<p>初看起来库级锁在并发量大会有严重的问题，但是通常情况下 MongoDB依然能够保持大并发量和高性能。这是因为 MongoDB 的锁粒度虽然很粗放，但是在锁处理机制上和普通数据库锁有挺大差异，主要差异是：</p>
+<p>初看起来库级锁在大并发环境下有严重的问题，但是 MongoDB 依然能够保持大并发量和高性能，这是因为 MongoDB 的锁粒度虽然很粗放，但是在锁处理机制和关系数据库锁有很大差异，主要表现在：</p>
 
 <ul>
-<li>MongoDB 没有完整事务支持，操作的原子性只到单个 document 一级，通常操作粒度比较小；</li>
-<li>MongoDB 的锁使用实际占用时间是内存数据计算和变更时间，通常很快；</li>
-<li>MongoDB 的锁有一种临时放弃机制，当出现需要等待慢速 IO 读取数据时，可以先放弃，等读取数据之后再重新获取；</li>
+<li>MongoDB 没有完整事务支持，操作原子性只到单个 document 级别，所以通常操作粒度比较小；</li>
+<li>MongoDB 锁实际占用时间是内存数据计算和变更时间，通常很快；</li>
+<li>MongoDB 锁有一种临时放弃机制，当出现需要等待慢速 IO 读写数据时，可以先临时放弃，等 IO 完成之后再重新获取锁。</li>
 </ul>
 
 
-<p>通常不出问题不等于没有问题，如果数据操作不当，依然有不少情况会引发某个操作长时间占用写锁，比如下面说到的前台建索引操作，当出现这种情况的时候，整个数据库就处于完全阻塞状态，无法进行任何读写操作，情况十分严重。</p>
+<p>通常不出问题不等于没有问题，如果数据操作不当，依然会导致长时间占用写锁，比如下面提到的前台建索引操作，当出现这种情况的时候，整个数据库就处于完全阻塞状态，无法进行任何读写操作，情况十分严重。</p>
 
-<p>解决问题的方法，尽量避免长时间占用写锁的操作，如果有一些集合操作实在难以避免，可以考虑把这个集合放到一个单独的 MongoDB 库里，因为 MongoDB 不同库锁是隔离的，这样可以避免某一个集合操作引发全局阻塞问题。</p>
+<p>解决问题的方法，尽量避免长时间占用写锁操作，如果有一些集合操作实在难以避免，可以考虑把这个集合放到一个单独的 MongoDB 库里，因为 MongoDB 不同库锁是相互隔离的，分离集合可以避免某一个集合操作引发全局阻塞问题。</p>
 
 <h2>建索引导致数据库阻塞</h2>
 
 <p><strong><em>坑爹指数：3星</em></strong></p>
 
-<p>上面提到 MongoDB 库级锁的问题，建索引就是一个容易引起长时间数据写锁的问题，MongoDB 在前台建索引是需要 hold 住一个写锁的，如果集合的数据量很大，建索引通常要花比较长时间，特别容易引起问题。</p>
+<p>上面提到了 MongoDB 库级锁的问题，建索引就是一个容易引起长时间写锁的问题，MongoDB 在前台建索引时需要占用一个写锁（而且不会临时放弃），如果集合的数据量很大，建索引通常要花比较长时间，特别容易引起问题。</p>
 
-<p>解决的方法比较简单，MongoDB 提供了两种建索引的访问，一种是 background 方式，不需要长时间占用锁，另一种是非 background 方式，需要长时间占用锁。使用 background 方式就可以解决问题。
-例如，为 posts 建立索引，不用使用</p>
+<p>解决的方法很简单，MongoDB 提供了两种建索引的访问，一种是 background 方式，不需要长时间占用写锁，另一种是非 background 方式，需要长时间占用锁。使用 background 方式就可以解决问题。
+例如，为超大表 posts 建立索引，<strong><em>千万不用使用</em></strong></p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class='javascript'><span class='line'><span class="nx">db</span><span class="p">.</span><span class="nx">posts</span><span class="p">.</span><span class="nx">ensureIndex</span><span class="p">({</span><span class="nx">user_id</span><span class="o">:</span> <span class="mi">1</span><span class="p">})</span>
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>使用</p>
+<p><strong><em>而应该使用</em></strong></p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class='javascript'><span class='line'><span class="nx">db</span><span class="p">.</span><span class="nx">posts</span><span class="p">.</span><span class="nx">ensureIndex</span><span class="p">({</span><span class="nx">user_id</span><span class="o">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="nx">background</span><span class="o">:</span> <span class="mi">1</span><span class="p">})</span>
 </span></code></pre></td></tr></table></div></figure>
 
 
-<h2>不合理使用 embed</h2>
+<h2>不合理使用嵌入 embed document</h2>
 
 <p><strong><em>坑爹指数：5星</em></strong></p>
 
-<p>embed 关联是 MongoDB 相比关系数据库差异明显的一个地方，可以在某一个 document 中嵌入其它子 document，这样可以在父子 document 保持在单一 collection 中，检索修改比较方便。</p>
+<p>embed document 是 MongoDB 相比关系数据库差异明显的一个地方，可以在某一个 document 中嵌入其它子 document，这样可以在父子 document 保持在单一 collection 中，检索修改比较方便。</p>
 
-<p>比如薄荷的使用情景有一个 Group document，用户会申请加入 Group，建模为 GroupRequest document，我们一开始使用 embed 的方式把 GroupRequest 放置到 Group 中。
+<p>比如薄荷的应用情景中有一个 Group document，用户申请加入 Group 建模为 GroupRequest document，我们最初的时候使用 embed 方式把 GroupRequest 放置到 Group 中。
 Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
@@ -179,17 +179,17 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>我们掉到这个坑里，差点就爬不出来了，导致有接近两周的时间系统不问题，高峰时段常有几分钟的系统卡顿，最严重一次甚至引起 MongoDB 宕机。</p>
+<p>这个使用方式让我们掉到坑里了，差点就爬不出来，它导致有接近两周的时间系统不问题，高峰时段常有几分钟的系统卡顿，最严重一次甚至引起 MongoDB 宕机。</p>
 
-<p>我们遇到的问题是某些活跃的 Group 的 group_requests 增加（当有新申请时）和更改（当通过或拒绝用户申请时）异常频繁，而这些操作经常长时间占用写锁，导致整个数据库阻塞。初步分析原因是，当有增加 group_request 操作时，Group 空间分配不够，需要重新分配空间（内存和硬盘都需要），耗时较长，另外 Group 上建的索引很多，移动 Group 位置涉及到更新大量索引中数据的位置，也比较耗时，所以引起了长时间占用锁问题。</p>
+<p>仔细分析后，发现某些活跃的 Group 的 group_requests 增加（当有新申请时）和更改（当通过或拒绝用户申请时）异常频繁，而这些操作经常长时间占用写锁，导致整个数据库阻塞。原因是当有增加 group_request 操作时，Group 预分配的空间不够，需要重新分配空间（内存和硬盘都需要），耗时较长，另外 Group 上建的索引很多，移动 Group 位置导致大量索引更新操作，也很耗时，综合起来引起了长时间占用锁问题。</p>
 
-<p>解决问题的方法，说起来也简单，就是把 embed 关联更改成类似关系数据库的普通外键关联，这样当 group_request 发送增加或修改都只发送在 GroupRequest 上，简单快速，避免长时间占用写锁问题。当关联对象的数据不固定或者经常发生变化时，一定要避免使用 embed 关联，不然会死的很惨。</p>
+<p>解决问题的方法，说起来也简单，就是把 embed 关联更改成的普通外键关联，就是类似关系数据库的做法，这样 group_request 增加或修改都只发送在 GroupRequest 上，简单快速，避免长时间占用写锁问题。当关联对象的数据不固定或者经常发生变化时，一定要避免使用 embed 关联，不然会死的很惨。</p>
 
 <h2>不合理使用 Array 字段</h2>
 
 <p><strong><em>坑爹指数：4星</em></strong></p>
 
-<p>MongoDB 的 Array 字段是其比较独特的一个特性，它可以在单个 document 里存储一些一对多关系。</p>
+<p>MongoDB 的 Array 字段是比较独特的一个特性，它可以在单个 document 里存储一些简单的一对多关系。</p>
 
 <p>薄荷有一个应用情景使用遇到严重的性能问题，直接上代码如下所示：</p>
 
@@ -208,11 +208,15 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>User 中通过一个数组 follower_user_ids 存用户关注的人的 id，用户关注的人从 10个到 3000 个不等，变化是比较频繁的，和上面 embed 引发的问题类似，频繁的 follower_user_ids 增加和修改操作导致大量较长时间的数据库写锁，从而引发 MongoDB 数据库性能急剧下降。</p>
+<p>User 中通过一个 Array 类型字段 follower_user_ids 保存用户关注的人的 id，用户关注的人从 10个到 3000 个不等，变化是比较频繁的，和上面 embed 引发的问题类似，频繁的 follower_user_ids 增加修改操作导致大量长时间数据库写锁，从而引发 MongoDB 数据库性能急剧下降。</p>
 
-<p>解决问题的方法，我们把 follower_user_ids 彻底放到了内存数据 redis 中，避免了频繁更改 MongoDB 中的 User, 从而彻底解决问题。如果不使用 redis，也可以类似 embed 做法，建立一个 UserFollower 集合，使用外键形式关键。</p>
+<p>解决问题的方法：我们把 follower_user_ids 转移到了内存数据 redis 中，避免了频繁更改 MongoDB 中的 User, 从而彻底解决了问题。如果不使用 redis，也可以建立一个 UserFollower 集合，使用外键形式关联。</p>
 
 <p>先列举上面几个坑吧，都是害人不浅的陷阱，使用 MongoDB 过程一定要多加注意，避免掉到坑里。</p>
+
+<p>参考资料：
+  * 1.<a href="http://docs.mongodb.org/manual/faq/concurrency/">MongoDB 锁机制详解</a>
+  * 2.<a href="http://docs.mongodb.org/manual/tutorial/build-indexes-in-the-background/">MongoDB 建立索引操作文档</a></p>
 </div>
   
   
@@ -2000,7 +2004,7 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a>
       </li>
     
       <li class="post">

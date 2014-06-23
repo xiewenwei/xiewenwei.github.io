@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: test" | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/test-/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-06-23T22:31:58+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[TestUnit的替代者MiniTest]]></title>
+    <link href="http://xiewenwei.github.com//blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/"/>
+    <updated>2012-12-02T22:07:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2012/12/02/test-unitde-ti-dai-zhe-minitest</id>
+    <content type="html"><![CDATA[<p>MiniTest 是新一代的 Ruby 测试框架，它已经成为 Ruby 1.9 的内置测试框架，据说它也将成为Rails 4的默认测试框架，可谓前途一片光明。</p>
+
+<h2>MiniTest 为什么成为最新 Ruby 和 Rails 的首选，它有哪些吸引人的东西呢？</h2>
+
+<p>Ruby 1.8时代，Ruby 和 Rails 的默认测试框架都是 TestUnit，TestUnit 历史悠久，它最大的问题是太慢，太臃肿了，它包含了一堆现在很少使用的第三方库，比如GTk v1, GTk v2, FxRuby，另外一个大问题的是它缺乏一些基本的测试特性，比如 spec DSL的测试风格，比如 mock 支持等等。</p>
+
+<p>MiniTest 相当于对 TestUnit 做了一次大的重构翻新，它继承了 TestUnit 大部分用法，消除 TestUnit 中不恰当的依赖，另外增加了基本的测试特性，比如 spec 和 mock等，整体上变得相当快速，简单整洁。</p>
+
+<p>在 Ruby 和 Rails 的世界，有一个测试框架 Rspec 使用也是非常广泛的，甚至目前使用广泛程度超过 TestUnit 和 MiniTest，它为什么没有成为默认框架呢？我想 MiniTest 相对于 Rspec 最大的优势是简单和延续性，Rspec 相比 MiniTest 要庞大复杂得多，当然功能也更强大，对于内置 Ruby 的类库来说，还是简单和保持延续（相对 TestUnit）更有优势。对于 Rails 来说，Rails 之父 DHH 和 Rspec 一直对不上眼，我想是 Rails 最终选择 MiniTest 最大的原因，哈哈。</p>
+
+<h2>MiniTest 使用示例</h2>
+
+<p>如果你用过 TestUnit，MiniTest 使用非常简单，下面是一个测试的 Hello World</p>
+
+<p>```ruby
+class HelloWold
+  def get_word</p>
+
+<pre><code>"Hello World!"
+</code></pre>
+
+<p>  end
+end</p>
+
+<p><code>
+测试代码
+</code>ruby
+require 'minitest/autorun'</p>
+
+<p>class HelloWoldTest &lt; MiniTest::Unit::TestCase
+  def test_get_word</p>
+
+<pre><code>assert_equal "Hello World!", HelloWold.new.get_word
+</code></pre>
+
+<p>  end
+end
+<code>
+测试代码, spec风格
+</code>ruby
+require 'minitest/autorun'</p>
+
+<p>describe HelloWold do
+  it "should return hello world" do</p>
+
+<pre><code>HelloWold.new.get_word.must_equal "Hello World!"
+</code></pre>
+
+<p>  end
+end
+```</p>
+
+<p><strong>如果要在 Rails 项目使用 MiniTest，可以使用 gem minitest-rails</strong>，使用 <code>minitest-rails</code> 之后，rails generator 生成的 test 就都转换为 minitest 风格代码。</p>
+
+<h2>总结</h2>
+
+<p>MiniTest 相当简单快速，它延续 TestUnit用法，上手非常快，同时它又提供了一些非常棒的特性，试用下来觉得非常不错，难怪它成为最新 Ruby 和 Rails 的首选，我打算今后就用它了。</p>
+
+<h2>参考资料</h2>
+
+<ol>
+<li><a href="https://github.com/seattlerb/minitest">minitest home</a></li>
+<li><a href="https://github.com/blowmage/minitest-rails">minitest-rails home</a></li>
+</ol>
+
+]]></content>
+  </entry>
+  
+</feed>

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: rails | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/rails/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-06-23T22:31:58+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[ActiveSupport::Concern 的工作原理]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/01/13/how-activesupport-corncern-work/"/>
+    <updated>2014-01-13T00:29:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/01/13/how-activesupport-corncern-work</id>
+    <content type="html"><![CDATA[<p>去年有一次的周记分享过 ActiveSupport::Concern （以下简称 Concern） 的用法，但是对它的实现原理一直不太明白，周末把它的实现源码仔细研究了一番，总算比较深入了解了它的工作原理，同时也让我对 Ruby 元编程有了更深的了解。</p>
+
+<p>Concern 主要用于解决 module mix 的依赖问题，同时简化 module mix 的步骤。
+关于依赖问题，必须用一个例子才好说明：</p>
+
+<p>```ruby
+module Foo
+  def self.included(base)</p>
+
+<pre><code>base.class_eval do
+  def self.method_injected_by_foo
+    ...
+  end
+end
+</code></pre>
+
+<p>  end
+end</p>
+
+<p>module Bar
+  include Foo
+  def self.included(base)</p>
+
+<pre><code>base.method_injected_by_foo
+</code></pre>
+
+<p>  end
+end</p>
+
+<p>class Host
+  include Foo # We need to include this dependency for Bar
+  include Bar # Bar is the module that Host really needs
+end
+```</p>
+
+<p>上面例子中 Host 为了 include Bar，必须得先 include Bar 依赖的 Foo，这是因为 Bar 在 include Foo 时，只是为 Bar extend method_injected_by_foo 方法，所以 Host 必须显式的 include Foo，才能够 extend method_injected_by_foo 方法。</p>
+
+<p>使用 Concern 后，代码可以简写为</p>
+
+<p>```ruby
+require 'active_support/concern'</p>
+
+<p>module Foo
+  extend ActiveSupport::Concern
+  included do</p>
+
+<pre><code>class_eval do
+  def self.method_injected_by_foo
+    ...
+  end
+end
+</code></pre>
+
+<p>  end
+end</p>
+
+<p>module Bar
+  extend ActiveSupport::Concern
+  include Foo</p>
+
+<p>  included do</p>
+
+<pre><code>self.method_injected_by_foo
+</code></pre>
+
+<p>  end
+end</p>
+
+<p>class Host
+  include Bar # works, Bar takes care now of its dependencies
+end
+```</p>
+
+<p>Bar 和 Foo 都 <code>extend ActiveSupport::Concern</code> 后，Host include Bar 已经不需要事先 mix Foo。</p>
+
+<p>这是怎么做到的呢，看看 Concern 的代码，其实代码很少：</p>
+
+<p>```ruby
+module
+  module Concern</p>
+
+<pre><code>def self.extended(base)
+  base.instance_variable_set("@_dependencies", [])
+end
+
+def append_features(base)
+  if base.instance_variable_defined?("@_dependencies")
+    base.instance_variable_get("@_dependencies") &lt;&lt; self
+    return false
+  else
+    return false if base &lt; self
+    @_dependencies.each { |dep| base.send(:include, dep) }
+    super
+    base.extend const_get("ClassMethods") if const_defined?("ClassMethods")
+    if const_defined?("InstanceMethods")
+      base.send :include, const_get("InstanceMethods")
+      ActiveSupport::Deprecation.warn "The InstanceMethods module inside ActiveSupport::Concern will be " \
+        "no longer included automatically. Please define instance methods directly in #{self} instead.", caller
+    end
+    base.class_eval(&amp;@_included_block) if instance_variable_defined?("@_included_block")
+  end
+end
+
+def included(base = nil, &amp;block)
+  if base.nil?
+    @_included_block = block
+  else
+    super
+  end
+end
+</code></pre>
+
+<p>  end
+end
+```</p>
+
+<p>关键部分是 <code>append_features</code> 方法，通过阅读 ruby 的文档和源码得知，ruby 在 include 一个 module 时，实际会触发两个方法，一个是 append_features，进行实际的 mixing 操作，包括增加常量，方法和变量到模块中，另外一个是 included 方法，也就是我们常用来作为 include 钩子的方法，默认的 included 是一个空方法，我们通过重载它使钩子起作用。</p>
+
+<p>从代码可知，当一个模块 <code>extend ActiveSupport::Concern</code> 时，将产生 3 个影响：</p>
+
+<ol>
+<li>为模块设置了一个实例变量</li>
+</ol>
+
+
+<p>变量为 @_dependencies，其值为空数组，表示依赖的模块，将在 append_features 中用到；</p>
+
+<ol>
+<li>append_features 方法被重载；</li>
+</ol>
+
+
+<p>重载后行为有了很大变化，它的处理分两种情况：
+一种是当它被一个有 @<em>dependencies 实例变量的模块被 include 时，直接把自身加到 @</em>dependencies 中，
+比如当 Bar include Foo 时，将触发 Foo 的 append_features(base) 方法，此时 base 是 Bar，self 是 Foo，由于 Bar 已经 <code>extend ActiveSupport::Concern</code>，Bar 的 @<em>dependencies 有定义，所以直接把 Foo 加到 Bar 的 @</em>dependencies 中，然后直接返回，没有立即执行 mixing 操作。</p>
+
+<p>当 Host include Bar 时，将触发 Bar 的 append_features(base) 方法，此时
+base 是 Host，self 是 Bar，Host 没有 <code>extend ActiveSupport::Concern</code>，所以 Host 的 @<em>dependencies 无定义，将执行下面的分支，首先 include Foo（通过 Bar 的 @</em>dependencies 获得 ），然后 include Bar (通过 super)，然后是后续操作。</p>
+
+<ol>
+<li>included 方法被重载；</li>
+</ol>
+
+
+<p>included 的动作比较简单，如果以没有参数形式调用，将把 block 存放到 @<em>included_block 变量中，@</em>included_block 的 block 将在 append_features 方法中使用。</p>
+
+<p>通过施加的这 3 个影响，ActiveSupport::Concern 完成了它的全部功能，非常简洁精练。</p>
+
+<p>从中学到的东西，包括：</p>
+
+<ol>
+<li><p>module 中 append_features 和 included 方法时 include 的核心；</p></li>
+<li><p>可以通过覆盖这些方法改变操作的行为；</p></li>
+<li><p>可以定义模块实例变量存储属于该模块的一些数据；</p></li>
+</ol>
+
+]]></content>
+  </entry>
+  
+</feed>
