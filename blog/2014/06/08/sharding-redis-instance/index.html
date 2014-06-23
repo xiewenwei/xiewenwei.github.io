@@ -1,0 +1,265 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>分割 Redis 实例 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="薄荷 App 上的伙伴功能大量使用了内存数据库 Redis，随着数据量的快速增长，Redis 膨胀得很快，已经接近 12 GB规模，这些数据全部放在单个 Redis 实例中。单个巨大 Redis 实例有如下几个坏处： 首先，需要一台内存很大的机器。Redis 是内存数据库， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/06/08/sharding-redis-instance/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">分割 Redis 实例</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-08T23:59:00+08:00" pubdate data-updated="true">2014-06-08</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>薄荷 App 上的伙伴功能大量使用了内存数据库 Redis，随着数据量的快速增长，Redis 膨胀得很快，已经接近 12 GB规模，这些数据全部放在单个 Redis 实例中。单个巨大 Redis 实例有如下几个坏处：</p>
+
+<ol>
+<li><p>首先，需要一台内存很大的机器。Redis 是内存数据库，它需要把所有需求全部放在内存中，需要为之装下 12 GB的 Redis 实例，至少需要 12 GB 内存大小的机器，考虑的预留增长空间，一般需要 12 * 1.5 约 18 GB 内存。 另外还有一个考虑的因素是，Redis 进行硬盘数据存储时，fork 进程需要消耗同样大小的内存，因此一个 12GB 的 redis 实例需要 32 GB左右的内存比较合适，这对机器提出了很高的要求，常常难以满足。</p></li>
+<li><p>然后，Redis 容易成为性能瓶颈。Redis 的并发模型是单进程单线程，它不能充分利用多核 CPU，在请求数很高，或者某一些请求处理比较慢时（比如一些大的数据排序），可能会成为系统的性能瓶颈。有方法可以缓解甚至这个问题，就是建立多个 Redis 实例，通过多个 Redis 连接来实现。</p></li>
+<li><p>另外，单个巨大的 Redis 实例也会增加数据管理难度，因为这么大的数据量，无论是复制，备份操作都比较慢，容易对线上系统造成冲击。</p></li>
+</ol>
+
+
+<p>因此，十分有必要把单个巨大的 Redis 实例分割成多个小的 Redis 实例。</p>
+
+<p>使用 Redis 的复制机制，可以在线平滑处理 Redis 实例分割，几乎不会对系统有很大的影响。</p>
+
+<p>分割的具体操作思路如下：</p>
+
+<ol>
+<li><p>首先，规划 Redis 分割策略，通常是基于业务划分，比如薄荷伙伴是基于业务分成 timeline, user_relationship, other 3个 Redis 实例。规划好之后，需要根据规划结果对应用程序中 Redis 程序代码做修改，通常是有一个统一的 Redis 链接修改为多个 Redis 连接，不同业务使用不同的连接。</p></li>
+<li><p>然后，通过 Redis 复制功能建立多个 Redis 副本，让不同 Redis 连接使用不同的 Redis 副本，在 Redis 副本中删除多余的数据。批量删除某个模式的 keys，可以使用下面的 shell 命令：</p></li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>redis-cli KEYS "&lt;pattern&gt;" | xargs redis-cli DEL</span></code></pre></td></tr></table></div></figure>
+
+
+<p><pattern> 改成实际的模式，如</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>redis-cli KEYS "user:*:followers" | xargs redis-cli DEL</span></code></pre></td></tr></table></div></figure>
+
+
+<p>表示删除 user followers 数据。</p>
+
+<ol>
+<li>最后通过来回切换并重启 Redis 实例达到完全分割 Redis 实例。</li>
+</ol>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-08T23:59:00+08:00" pubdate data-updated="true">2014-06-08</time>
+      
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/01/13/how-activesupport-corncern-work/" title="Previous Post: ActiveSupport::Concern 的工作原理">&laquo; ActiveSupport::Concern 的工作原理</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2014/06/16/redis-data-protection/" title="Next Post: 保护 Redis 的数据">保护 Redis 的数据 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/06/08/sharding-redis-instance/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/06/08/sharding-redis-instance/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

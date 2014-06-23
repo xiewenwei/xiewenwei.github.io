@@ -1,0 +1,458 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Ruby: block proc and lambda - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="在规则引擎中，Ruby 的闭包使用特别频繁，而且有 block，Proc和 lambda 等后几种形式的用法，很让人困惑。为了深入理解代码，再次认真学习了一下 Ruby 的闭包，特别是 block，proc 和 lambda 几种用法的异同，这次的周记就和大家分享一下心得。 闭包是 Ruby &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2012/11/12/ruby-block-proc-and-lambda/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Ruby: block proc and lambda</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-12T14:12:00+08:00" pubdate data-updated="true">2012-11-12</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>在规则引擎中，Ruby 的闭包使用特别频繁，而且有 block，Proc和 lambda 等后几种形式的用法，很让人困惑。为了深入理解代码，再次认真学习了一下 Ruby 的闭包，特别是 block，proc 和 lambda 几种用法的异同，这次的周记就和大家分享一下心得。</p>
+
+<p>闭包是 Ruby 相对其它语言特别优势之一，很多语言有闭包，但是唯有 Ruby 把闭包的优势发挥得淋漓尽致。Ruby 的哲学之一：同一个问题现实中有多种解决方法，所以 Ruby 中也有多种解法，所以闭包的使用也有多种方法。</p>
+
+<p>先看一个代码的例子：
+Example 1:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">def</span> <span class="nf">foo1</span>
+</span><span class='line'>  <span class="k">yield</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
+</span><span class='line'>  <span class="n">b</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="n">b</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo1 in block&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="n">foo2</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo2 in block&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
+</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
+</span><span class='line'><span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
+</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>输出：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='sh'><span class='line'>》foo1 in block
+</span><span class='line'>》foo2 in block
+</span><span class='line'>》foo in proc
+</span><span class='line'>》foo in proc
+</span><span class='line'>》foo in lambda
+</span><span class='line'>》foo in lambda
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>大家是不是有些困惑，首先是方法 foo1 和 foo2 都能接收闭包，它们这两种写法有什么区别，然后是作为参数的三种闭包 block，proc和 lambda有什么区别。</p>
+
+<h2>1. yield 和 block call 的区别</h2>
+
+<p>yield 和 block call 两种都能实现运行闭包，从实际运行效果来说，区别不大。其区别主要在于：</p>
+
+<h3>1.1 闭包的传递和保存</h3>
+
+<p>因为闭包已经传递到参数里，所以可以继续传递或保存起来，例如：</p>
+
+<p>Exampl 2:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">class</span> <span class="nc">A</span>
+</span><span class='line'>      <span class="k">def</span> <span class="nf">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
+</span><span class='line'>         <span class="vi">@proc</span> <span class="o">=</span> <span class="n">b</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>      <span class="k">def</span> <span class="nf">foo2</span>
+</span><span class='line'>          <span class="vi">@proc</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="vi">@proc</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">a</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;proc from foo1&quot;</span> <span class="p">}</span>
+</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo2</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h3>1.2 性能</h3>
+
+<p>yield不是方法调用，而是 Ruby 的关键字，yield 要比 block call 比快 1 倍左右。</p>
+
+<h2>2. block 和 proc, lambda 的区别</h2>
+
+<p>很简单直接，引入 proc 和 lambda 就是为了复用，避免重复定义，例如在 example 1 中，使用 proc 变量存储闭包，避免重复定义两个 block 。</p>
+
+<h2>3. proc 和 lambda 的区别</h2>
+
+<p>这大概是最让人困惑的地方，从 Example 1 的行为上看，他们的效果是一致的，为什么要用两种不同的表达方式。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>确实，对于简单的情况，比如 Example 1的情况，他们的行为是一致的，但是主要在两个地方有明显差异：</p>
+
+<h3>1.1 参数检查</h3>
+
+<p>还是例子说话
+Example 3:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
+</span><span class='line'>      <span class="n">x</span> <span class="o">=</span> <span class="mi">100</span>
+</span><span class='line'>      <span class="k">yield</span> <span class="n">x</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>   <span class="n">lambda_proc1</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc1</span><span class="p">)</span>
+</span><span class='line'>   <span class="n">lambda_proc2</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc2</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>输出</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》a is 100 b is nil
+</span><span class='line'>   》a is 100
+</span><span class='line'>   》ArgumentError: wrong number of arguments <span class="o">(</span>1 <span class="k">for </span>2<span class="o">)</span>
+</span><span class='line'>      …
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>    <br/>
+可见，proc 不会对参数进行个数匹配检查，而 lambda 会，如果不匹配还会报异常，所以安全起见，建议优先用 lambda。</p>
+
+<h3>1.2 返回上层</h3>
+
+<p>还是例子说话
+Example 4:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
+</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from foo from inside proc&quot;</span> <span class="p">}</span>
+</span><span class='line'>     <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control leaves foo here</span>
+</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from foo&quot;</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>   <span class="k">def</span> <span class="nf">bar</span>
+</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from lambda&quot;</span> <span class="p">}</span>
+</span><span class='line'>     <span class="nb">puts</span> <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control does not leave bar here</span>
+</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from bar&quot;</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>   <span class="nb">puts</span> <span class="n">foo</span>
+</span><span class='line'>   <span class="nb">puts</span> <span class="n">bar</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>   输出</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》return from foo from inside proc
+</span><span class='line'>   》return from lambda
+</span><span class='line'>   》return from bar
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p> <br/>
+可见，proc 中，return 相当于执行了闭包环境里的 return，而 lambda 只是返回call 闭包所在环境。</p>
+
+<p><em>总结：闭包是 Ruby 的强大特性，它的几种表达方式block，proc 和 lambda有细微差别，要用好它需要对其深入理解。</em></p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-12T14:12:00+08:00" pubdate data-updated="true">2012-11-12</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/ruby/'>Ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/07/02/wo-men-xing-fu-de-yi-jia/" title="Previous Post: 我们幸福的一家">&laquo; 我们幸福的一家</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2012/11/18/rubyconfchina2012gan-xiang/" title="Next Post: RubyConfChina2012感想">RubyConfChina2012感想 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2012/11/12/ruby-block-proc-and-lambda/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2012/11/12/ruby-block-proc-and-lambda/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

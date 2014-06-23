@@ -1,0 +1,308 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Ruby 中的 p 和 puts - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="p 和 puts 是 Ruby 中特别常用的方法，很多童鞋可能认为它们是差不多的，使用的时候也不加注意，但是仔细考究起来，它们是有明显差别的。 先举一个例子 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15 class Foo def inspect &quot;foo &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2012/07/02/ruby-p-vs-puts/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Ruby 中的 p 和 puts</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-02T10:41:00+08:00" pubdate data-updated="true">2012-07-02</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>p 和 puts 是 Ruby 中特别常用的方法，很多童鞋可能认为它们是差不多的，使用的时候也不加注意，但是仔细考究起来，它们是有明显差别的。</p>
+
+<p>先举一个例子</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">Foo</span>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">inspect</span>
+</span><span class='line'>      <span class="s2">&quot;foo from inspect&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">to_s</span>
+</span><span class='line'>      <span class="s2">&quot;foo from to_s&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">foo</span> <span class="o">=</span> <span class="no">Foo</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="nb">p</span> <span class="n">foo</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="n">foo</span>
+</span><span class='line'>  <span class="nb">p</span> <span class="s2">&quot;p: &lt;</span><span class="si">#{</span><span class="n">foo</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;p: &lt;</span><span class="si">#{</span><span class="n">foo</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这段代码的输出是</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">foo</span> <span class="n">from</span> <span class="nb">inspect</span>
+</span><span class='line'><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span>
+</span><span class='line'><span class="nb">p</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span><span class="o">&gt;</span>
+</span><span class='line'><span class="nb">puts</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span><span class="o">&gt;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><code>p obj</code> 相当于 <code>puts obj.inspect</code>，而 <code>puts obj</code> 相当于 <code>puts obj.to_s</code>，
+使用的方便是明显区别的，p 是使用 obj 的 inspect 方法，而 puts 是 to_s 方法。</p>
+
+<p>为什么会这样呢？这个我想可以从 to_s 和 inspect 的区别说起，to_s 是对象的字符串表示，
+是 puts 和双引号字符使用的方法。inspect 是对象状态的表示，通用用于 debug 中。
+Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类名和地址。</p>
+
+<p>所以p 和 puts主要是用途的不同，p 是作为 debug 输出，而 puts 作为对象的字符串表示输出。</p>
+
+<p>另外值得一提的是，在 irb console 中，命令行中表达式求值，使用的是 p 对象的 inspect 方法。另外，通常 debug 输出命令，也是使用对象的 inspect 方法。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-02T10:41:00+08:00" pubdate data-updated="true">2012-07-02</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/ruby/'>Ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/06/16/proxychains-svn/" title="Previous Post: 使用 proxychains 访问远程 svn 服务器">&laquo; 使用 proxychains 访问远程 svn 服务器</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2012/07/02/wo-men-xing-fu-de-yi-jia/" title="Next Post: 我们幸福的一家">我们幸福的一家 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2012/07/02/ruby-p-vs-puts/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2012/07/02/ruby-p-vs-puts/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

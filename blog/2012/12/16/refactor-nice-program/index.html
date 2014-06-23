@@ -1,0 +1,311 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>重构 NICE 方案程序 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。 NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2012/12/16/refactor-nice-program/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">重构 NICE 方案程序</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-16T22:42:00+08:00" pubdate data-updated="true">2012-12-16</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。</p>
+
+<p>NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码，简单的说就是把生成工作分解成多个步骤，为每一个步骤定义一个方法，然后在一个主控方法中分别调用各个方法。这看起来是比较简单的，但是升级维护变得很困难，比如要增加一个新版本的方案生成方法，不得不在代码中很多地方加入 <code>if else</code> 判断。</p>
+
+<p>这次的工作就是要增加一个新版本的 NICE 方案生成方法，而且要求对之前的所有方案生成提供兼容。考虑再三，不打算在之前的代码上增加许多 <code>if else</code> 完成工作，于是对整个生成代码做一次大的重构。</p>
+
+<p>从工厂流水线的工作方式得到启发，感觉 NICE 的评测和方案生成就象是流水线作业。NICE 评测从输入到评测报告的过程，可以抽象为 input 经过一系列的 analyzer 的处理，最后得到一个 evaluation result的过程。而 NICE 方案可以抽象为，输入是 input 和评测报告，经过一系列 builder 的处理，最后得多一个 solution result.</p>
+
+<p>重构后，NICE 评测生成过程的核心类图如下：
+<img src="/images/house/analyzer.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">EvaluationResult</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="c1"># Order of analyzer must be restricted</span>
+</span><span class='line'>  <span class="o">[</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">BodyAnalyzer</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TagAnalyzer</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TipAnalyzer</span>
+</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">analyzer</span><span class="o">|</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># save result ...</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>评测分析过程基类是 Analyzer，BodyAnalyzer，TagAnalyzer 和 TipAnalyzer 都从它继承而来，每一个 Analyzer 完成一部分的评测分析工作。重构之后，扩展评测变得很容易，只要增加一种特定的 Analyzer 即可，而且这个 Analyzer 完全可以从之前的 Analyzer 继承已达到代码复用。</p>
+
+<p>重构后，NICE 方案生成过程的核心类图如下：
+<img src="/images/house/builder.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">SolutionResult</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="n">input_wrapper</span> <span class="o">=</span> <span class="no">Solution</span><span class="o">::</span><span class="no">InputWrapper</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">)</span>
+</span><span class='line'>  <span class="c1"># Order of builder must be restricted</span>
+</span><span class='line'>  <span class="o">[</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">PreparingBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">WeekPlanBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">EatTipBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActivityPlanBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActTipBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">NoticeBuilder</span>
+</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">builder</span><span class="o">|</span>
+</span><span class='line'>    <span class="n">builder</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input_wrapper</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">build</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># save result ...</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>方案生成过程基类是 Builder，PreparingBuilder，WeekPlanBuilder 和 NoticeBuilder 都从它继承而来，每一个 Builder 完成一部分的方案生成工作。</p>
+
+<p>流水线作业的设计模式很适合象 NICE 方案生成的工作，它的特点是：整体过程复杂，可以分解为多个类似的步骤，这些步骤共享相同的输入和输出对象。使用这种设计模式后，代码结果变成简单清晰，而且易于扩展维护。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-16T22:42:00+08:00" pubdate data-updated="true">2012-12-16</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/-design/'>"Design</a>, <a class='category' href='/blog/categories/pattern-/'>Pattern"</a>, <a class='category' href='/blog/categories/ruby/'>Ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/12/09/ruby-constant-lookup/" title="Previous Post: Ruby 常量查找路径">&laquo; Ruby 常量查找路径</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2013/01/03/update-ruby-1-8-to-1-9/" title="Next Post: 升级 Ruby 1.8.7 到 1.9.3">升级 Ruby 1.8.7 到 1.9.3 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2012/12/16/refactor-nice-program/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2012/12/16/refactor-nice-program/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

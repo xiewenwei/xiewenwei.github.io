@@ -1,0 +1,1419 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。 NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/page/2/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div class="blog-index">
+  
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/12/16/refactor-nice-program/">重构 NICE 方案程序</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-16T22:42:00+08:00" pubdate data-updated="true">2012-12-16</time>
+        
+         | <a href="/blog/2012/12/16/refactor-nice-program/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。</p>
+
+<p>NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码，简单的说就是把生成工作分解成多个步骤，为每一个步骤定义一个方法，然后在一个主控方法中分别调用各个方法。这看起来是比较简单的，但是升级维护变得很困难，比如要增加一个新版本的方案生成方法，不得不在代码中很多地方加入 <code>if else</code> 判断。</p>
+
+<p>这次的工作就是要增加一个新版本的 NICE 方案生成方法，而且要求对之前的所有方案生成提供兼容。考虑再三，不打算在之前的代码上增加许多 <code>if else</code> 完成工作，于是对整个生成代码做一次大的重构。</p>
+
+<p>从工厂流水线的工作方式得到启发，感觉 NICE 的评测和方案生成就象是流水线作业。NICE 评测从输入到评测报告的过程，可以抽象为 input 经过一系列的 analyzer 的处理，最后得到一个 evaluation result的过程。而 NICE 方案可以抽象为，输入是 input 和评测报告，经过一系列 builder 的处理，最后得多一个 solution result.</p>
+
+<p>重构后，NICE 评测生成过程的核心类图如下：
+<img src="/images/house/analyzer.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">EvaluationResult</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="c1"># Order of analyzer must be restricted</span>
+</span><span class='line'>  <span class="o">[</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">BodyAnalyzer</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TagAnalyzer</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TipAnalyzer</span>
+</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">analyzer</span><span class="o">|</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># save result ...</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>评测分析过程基类是 Analyzer，BodyAnalyzer，TagAnalyzer 和 TipAnalyzer 都从它继承而来，每一个 Analyzer 完成一部分的评测分析工作。重构之后，扩展评测变得很容易，只要增加一种特定的 Analyzer 即可，而且这个 Analyzer 完全可以从之前的 Analyzer 继承已达到代码复用。</p>
+
+<p>重构后，NICE 方案生成过程的核心类图如下：
+<img src="/images/house/builder.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">SolutionResult</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="n">input_wrapper</span> <span class="o">=</span> <span class="no">Solution</span><span class="o">::</span><span class="no">InputWrapper</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">)</span>
+</span><span class='line'>  <span class="c1"># Order of builder must be restricted</span>
+</span><span class='line'>  <span class="o">[</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">PreparingBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">WeekPlanBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">EatTipBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActivityPlanBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActTipBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">NoticeBuilder</span>
+</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">builder</span><span class="o">|</span>
+</span><span class='line'>    <span class="n">builder</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input_wrapper</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">build</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># save result ...</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>方案生成过程基类是 Builder，PreparingBuilder，WeekPlanBuilder 和 NoticeBuilder 都从它继承而来，每一个 Builder 完成一部分的方案生成工作。</p>
+
+<p>流水线作业的设计模式很适合象 NICE 方案生成的工作，它的特点是：整体过程复杂，可以分解为多个类似的步骤，这些步骤共享相同的输入和输出对象。使用这种设计模式后，代码结果变成简单清晰，而且易于扩展维护。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/12/09/ruby-constant-lookup/">Ruby 常量查找路径</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-09T21:44:00+08:00" pubdate data-updated="true">2012-12-09</time>
+        
+         | <a href="/blog/2012/12/09/ruby-constant-lookup/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Ruby 的常量查找路径问题是一直困扰我的一个问题，在工作中遇到过好几次，一直没有彻底弄清楚到底为什么，最近在读一本书《Ruby 元编程》，对 Ruby 对象模型有了更深入的认识，另外读了一篇 blog《Everything you ever wanted to know about constant lookup in Ruby》, 让我总算把 Ruby 常量查找路径这个问题搞得比较清楚。</p>
+
+<h2>第一个遇到的问题，我还曾经在 Ruby-China 上发过帖。</h2>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">M1</span>
+</span><span class='line'>  <span class="no">CT</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">C1</span>
+</span><span class='line'>  <span class="no">CK</span> <span class="o">=</span> <span class="s2">&quot;ck&quot;</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">M1</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">method1</span>
+</span><span class='line'>    <span class="nb">puts</span> <span class="nb">self</span>
+</span><span class='line'>    <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CK</span><span class="si">}</span><span class="s2"> in method1&quot;</span>
+</span><span class='line'>    <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CT</span><span class="si">}</span><span class="s2"> in method1&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">class</span> <span class="o">&lt;&lt;</span> <span class="nb">self</span>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">method2</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="nb">self</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CK</span><span class="si">}</span><span class="s2"> in method1&quot;</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CT</span><span class="si">}</span><span class="s2"> in method2&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="no">C1</span><span class="o">.</span><span class="n">method1</span>
+</span><span class='line'><span class="no">C1</span><span class="o">.</span><span class="n">method2</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>输出结果是</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">C1</span>
+</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method1</span>
+</span><span class='line'><span class="n">ok</span> <span class="k">in</span> <span class="n">method1</span>
+</span><span class='line'><span class="no">C1</span>
+</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method2</span>
+</span><span class='line'><span class="no">NameError</span><span class="p">:</span> <span class="n">uninitialized</span> <span class="n">constant</span> <span class="no">Class</span><span class="o">::</span><span class="no">CT</span>
+</span><span class='line'>    <span class="n">from</span> <span class="p">(</span><span class="n">irb</span><span class="p">):</span><span class="mi">16</span><span class="ss">:in</span> <span class="sb">`method2&#39;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这是我在重构薄荷网代码时候遇到的问题，method1 和 method2 都是常见的类方法的定义方面，我向来认为它们是等价可替换的写法，但是从实际执行的结果看，它们里面的常量查找路径不一样。</p>
+
+<p>如果我把 M1 的定义改成下面的样子：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">M1</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">included</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">self</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>  <span class="no">CT</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>执行结果是：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">C1</span>
+</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method1</span>
+</span><span class='line'><span class="n">ok</span> <span class="k">in</span> <span class="n">method1</span>
+</span><span class='line'><span class="no">C1</span>
+</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method2</span>
+</span><span class='line'><span class="n">ok</span> <span class="k">in</span> <span class="n">method2</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>还有一个问题是也是经常遇到的，抽象成问题代码如下：</h2>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">A</span>
+</span><span class='line'>  <span class="k">module</span> <span class="nn">M</span>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">a_method</span>
+</span><span class='line'>      <span class="c1">#...</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">A</span><span class="o">::</span><span class="n">B</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="n">M</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>会报异常：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">NameError</span><span class="p">:</span> <span class="n">uninitialized</span> <span class="n">constant</span> <span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="o">::</span><span class="n">M</span>
+</span><span class='line'>  <span class="n">from</span> <span class="p">(</span><span class="n">irb</span><span class="p">):</span><span class="mi">10</span><span class="ss">:in</span> <span class="sb">`&lt;class:B&gt;&#39;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>Ruby 常量查找时依据两条路径</h2>
+
+<ul>
+<li>A. Module.nesting</li>
+<li>B. open class/module 的 ancestors</li>
+</ul>
+
+
+<p>A 比 B 优先，A 找不到了才到 B 中查找。</p>
+
+<p><code>A.Module.nesting</code> 的概念比较容易理解，它是指代码位置的 module 嵌套情况，它是一个数组，从最内层的嵌套一直到最外层的嵌套，如果没有嵌套，数组为空。任何一处代码位置都有 <code>Module.nesting</code> 值，可以通过下面的代码打印出各个位置的 Module.nesting 值。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">module</span> <span class="nn">A</span>
+</span><span class='line'>  <span class="k">module</span> <span class="nn">B</span>
+</span><span class='line'>    <span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
+</span><span class='line'>    <span class="k">module</span> <span class="nn">C</span>
+</span><span class='line'>      <span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">module</span> <span class="nn">A::B</span>
+</span><span class='line'>  <span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>输出是：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="o">[]</span>
+</span><span class='line'><span class="o">[</span><span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="p">,</span> <span class="n">A</span><span class="o">]</span>
+</span><span class='line'><span class="o">[</span><span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="o">::</span><span class="n">C</span><span class="p">,</span> <span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="p">,</span> <span class="n">A</span><span class="o">]</span>
+</span><span class='line'><span class="o">[</span><span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="o">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>大家有没有注意到，<code>module A::B</code> 这种快捷写法会导致 <code>A</code> 不在 <code>Module.nesting</code> 里，这就是上述第二个问题的根源，因为 M 是 A module 下的常量，<code>module A::B</code> 写法导致不会查找 <code>A::M</code>。</p>
+
+<p>说完 <code>A Module.nesting</code>，再说一下 <code>B open class/module 的 ancestors</code>，这个问题相对复杂很多。简单的说，在 Ruby 代码的任何位置，都有一个 <code>self</code> 存在，同样也有一个 <code>open class/module</code> 存在，在模块和类定义处，它通常就是对应的模块和类，在方法内部，它是方法对应的类。对于 ancestors，我们可以通过代码位置 <code>open class/module</code> 的 ancestors 方法取得。</p>
+
+<p>（备注：ancestors 在引入 singleton_class 概念之后变得有点复杂，如不清楚可参考《Ruby 元编程》）</p>
+
+<p>上述第一个问题：
+在method1 中
+A 是 <code>[C1]</code>
+<code>open class/module</code> 是 <code>C1</code>，所以 ancestors 是 <code>[C1, M1, Object, Kernel, BasicObject]</code>
+CK 在 A 可以找到，CT 在 B 可以找到。</p>
+
+<p>method2 中
+A 是 <code>[C1]</code>
+<code>open class/module</code> 是 <strong>C1 的 singleton_class</strong> , 所以 ancestors 是 <code>[Class, Module, Object, Kernel, BasicObject]</code>
+CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
+
+<p>对于</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">M1</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">included</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">self</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>  <span class="no">CT</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>可运行，是因为这时，在 method2 中，<code>open class/module</code> <strong>C1 的 singleton_class</strong> 扩展了 M1，所以 ancestors 变成了
+<code>[M1, Class, Module, Object, Kernel, BasicObject]</code>。</p>
+
+<p>至此，这两个困扰我多时的问题终于彻底搞清楚了。这个过程给我的一个体会是：面对技术上的一些疑问，如果只是浅尝辄止，是永远不能够真正掌握它的，只有深入专研，透彻理解它的原理，才能够真正掌握它，获得真正的能力提升。</p>
+
+<p>文章提到的 blog 网址：
+<a href="http://http://cirw.in/blog/constant-lookup">Everything you ever wanted to know about constant lookup in Ruby</a></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/">TestUnit的替代者MiniTest</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-02T22:07:00+08:00" pubdate data-updated="true">2012-12-02</time>
+        
+         | <a href="/blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>MiniTest 是新一代的 Ruby 测试框架，它已经成为 Ruby 1.9 的内置测试框架，据说它也将成为Rails 4的默认测试框架，可谓前途一片光明。</p>
+
+<h2>MiniTest 为什么成为最新 Ruby 和 Rails 的首选，它有哪些吸引人的东西呢？</h2>
+
+<p>Ruby 1.8时代，Ruby 和 Rails 的默认测试框架都是 TestUnit，TestUnit 历史悠久，它最大的问题是太慢，太臃肿了，它包含了一堆现在很少使用的第三方库，比如GTk v1, GTk v2, FxRuby，另外一个大问题的是它缺乏一些基本的测试特性，比如 spec DSL的测试风格，比如 mock 支持等等。</p>
+
+<p>MiniTest 相当于对 TestUnit 做了一次大的重构翻新，它继承了 TestUnit 大部分用法，消除 TestUnit 中不恰当的依赖，另外增加了基本的测试特性，比如 spec 和 mock等，整体上变得相当快速，简单整洁。</p>
+
+<p>在 Ruby 和 Rails 的世界，有一个测试框架 Rspec 使用也是非常广泛的，甚至目前使用广泛程度超过 TestUnit 和 MiniTest，它为什么没有成为默认框架呢？我想 MiniTest 相对于 Rspec 最大的优势是简单和延续性，Rspec 相比 MiniTest 要庞大复杂得多，当然功能也更强大，对于内置 Ruby 的类库来说，还是简单和保持延续（相对 TestUnit）更有优势。对于 Rails 来说，Rails 之父 DHH 和 Rspec 一直对不上眼，我想是 Rails 最终选择 MiniTest 最大的原因，哈哈。</p>
+
+<h2>MiniTest 使用示例</h2>
+
+<p>如果你用过 TestUnit，MiniTest 使用非常简单，下面是一个测试的 Hello World</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">HelloWold</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">get_word</span>
+</span><span class='line'>    <span class="s2">&quot;Hello World!&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>测试代码</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;minitest/autorun&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">HelloWoldTest</span> <span class="o">&lt;</span> <span class="no">MiniTest</span><span class="o">::</span><span class="no">Unit</span><span class="o">::</span><span class="no">TestCase</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">test_get_word</span>
+</span><span class='line'>    <span class="n">assert_equal</span> <span class="s2">&quot;Hello World!&quot;</span><span class="p">,</span> <span class="no">HelloWold</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">get_word</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>测试代码, spec风格</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;minitest/autorun&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">describe</span> <span class="no">HelloWold</span> <span class="k">do</span>
+</span><span class='line'>  <span class="n">it</span> <span class="s2">&quot;should return hello world&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="no">HelloWold</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">get_word</span><span class="o">.</span><span class="n">must_equal</span> <span class="s2">&quot;Hello World!&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><strong>如果要在 Rails 项目使用 MiniTest，可以使用 gem minitest-rails</strong>，使用 <code>minitest-rails</code> 之后，rails generator 生成的 test 就都转换为 minitest 风格代码。</p>
+
+<h2>总结</h2>
+
+<p>MiniTest 相当简单快速，它延续 TestUnit用法，上手非常快，同时它又提供了一些非常棒的特性，试用下来觉得非常不错，难怪它成为最新 Ruby 和 Rails 的首选，我打算今后就用它了。</p>
+
+<h2>参考资料</h2>
+
+<ol>
+<li><a href="https://github.com/seattlerb/minitest">minitest home</a></li>
+<li><a href="https://github.com/blowmage/minitest-rails">minitest-rails home</a></li>
+</ol>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/">Ruby的运算符和语句优先级</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-25T22:03:00+08:00" pubdate data-updated="true">2012-11-25</time>
+        
+         | <a href="/blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Ruby 是一种表达能力很强的语言，这得意于它异常丰富的运算符和语法糖，虽然 Ruby 一直把最小惊讶原则作为它的哲学之一，但还是常常看到让人惊讶不已，难于理解的代码，这可能是因为对它运算符和语句优先级理解不透导致，今天就和大家聊一聊 Ruby 运算符和语句的优先级。</p>
+
+<p>先看一句简单的代码，猜一猜它的输出是什么。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="nb">puts</span> <span class="p">{}</span><span class="o">.</span><span class="n">class</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>很多人一定以为结果是 Hash，但实事上结果是空，不信可以在 irb 里试一试。</p>
+
+<p>再看一段代码。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 &amp;&amp; 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 and 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="n">a</span> <span class="o">=</span> <span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span>
+</span><span class='line'><span class="n">b</span> <span class="o">=</span> <span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span>
+</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;b is </span><span class="si">#{</span><span class="n">b</span><span class="si">}</span><span class="s2">&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>结果是：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
+</span><span class='line'><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
+</span><span class='line'><span class="n">a</span> <span class="n">is</span> <span class="mi">3</span>
+</span><span class='line'><span class="n">b</span> <span class="n">is</span> <span class="mi">5</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>有没有觉得奇怪 b 怎么是 5 而不是 3 呢。</p>
+
+<p>如果这两个例子你也觉得奇怪，那说明你对 Ruby 一些运算符和语句的优先级理解还不透彻，判断有误。
+<code>puts {}.class</code> 实际上相当于 <code>(puts {}).class</code> -> <code>nil.class</code> 所以输出为空。<code>{}</code>相当于一个空的 block，优先和方法 puts 结合。
+<code>&amp;&amp; 和 and</code> 的优先是不同的，而且和 <code>=</code> 号的优先级顺序比较， <code>&amp;&amp; &gt; = &gt; and</code>，所以 <code>a = 5 &amp;&amp; 3</code> 相当于 <code>a = ( 5 &amp;&amp; 3)</code>，而 <code>b = 5 and 3</code> 相当于 <code>( b = 5 ) and 3</code>，所以结果 a 和 b的值是不同的。</p>
+
+<p>下面一张表格是 Ruby 中常见的运算符和语句的优先级列表，从上到下优先级递减。</p>
+
+<table border="1" cellspacing="0">
+<tr style="background:#efefef;">
+  <caption>Ruby operators (highest to lowest precedence)</caption>
+  <tr style="background:#efefef;">
+    <th>Method</th>
+    <th>Operator</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>Yes</td>
+    <td><code>[ ]</code> <code>[ ]=</code></td>
+    <td>Element reference, element set</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>**</code></td>
+    <td>Exponentiation (raise to the power)</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>!</code> <code>~</code> <code>+</code> <code>-</code></td>
+    <td>Not, complement, unary plus and minus (method names for the last two are <code>+@</code> and <code>-@</code>)</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>*</code> <code>/</code> <code>%</code></td>
+    <td>Multiply, divide, and modulo</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>+</code> <code>-</code></td>
+    <td>Addition and subtraction</td>
+  </tr><tr>
+
+    <td>Yes</td>
+    <td><code>&gt;&gt;</code> <code>&lt;&lt;</code></td>
+    <td>Right and left bitwise shift</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>&amp;</code></td>
+    <td>Bitwise `AND&#8217;</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>^</code> <code>|</code></td>
+    <td>Bitwise exclusive `OR&#8217; and regular `OR&#8217;</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>&lt;=</code> <code>&lt;</code> <code>&gt;</code> <code>&gt;=</code></td>
+    <td>Comparison operators</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>&lt;=&gt;</code> <code>==</code> <code>===</code> <code>!=</code> <code>=~</code> <code>!~</code></td>
+    <td>Equality and pattern match operators (<code>!=</code> and <code>!~</code> may not be defined as methods)</td>
+  </tr><tr>
+    <td></td>
+    <td><code>&amp;&amp;</code></td>
+    <td>Logical `AND&#8217;</td>
+  </tr><tr>
+    <td></td>
+    <td><code>||</code></td>
+    <td>Logical `AND&#8217;</td>
+  </tr><tr>
+    <td></td>
+    <td><code>..</code> <code>...</code></td>
+    <td>Range (inclusive and exclusive)</td>
+  </tr><tr>
+    <td></td>
+    <td><code>?&nbsp;:</code></td>
+    <td>Ternary if-then-else</td>
+  </tr><tr>
+    <td></td>
+    <td><code>=</code> <code>%=</code> <code></code>{ <code>/=</code> <code>-=</code> <code>+=</code> <code>|=</code> <code>&amp;=</code> <code>&gt;&gt;=</code> <code>&lt;&lt;=</code> <code>*=</code> <code>&amp;&amp;=</code> <code>||=</code> <code>**=</code></td>
+    <td>Assignment</td>
+  </tr><tr>
+    <td></td>
+    <td><code>defined?</code></td>
+    <td>Check if specified symbol defined</td>
+  </tr><tr>
+    <td></td>
+    <td><code>not</code></td>
+    <td>Logical negation</td>
+  </tr><tr>
+    <td></td>
+    <td><code>or</code> <code>and</code></td>
+    <td>Logical composition</td>
+  </tr><tr>
+    <td></td>
+    <td><code>if</code> <code>unless</code> <code>while</code> <code>until</code></td>
+    <td>Expression modifiers</td>
+  </tr><tr>
+
+    <td></td>
+    <td><code>begin/end</code></td>
+    <td>Block expression</td>
+  </tr>
+</table>
+
+
+<br/>
+
+
+<p>几条便于记忆的原则：</p>
+
+<ol>
+<li>关键字类如if and 等的优先级是要比符号类低；</li>
+<li>赋值符号 <code>= ||=</code> 等优先级也比较低，仅次于关键字类；</li>
+<li><code>[] []=</code> 元素引用的优先级非常高。</li>
+</ol>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/18/rubyconfchina2012gan-xiang/">RubyConfChina2012感想</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-18T22:11:00+08:00" pubdate data-updated="true">2012-11-18</time>
+        
+         | <a href="/blog/2012/11/18/rubyconfchina2012gan-xiang/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>昨天参加了 RubyConfChina2012 大会，听了好几个非常精彩的主题演讲，收获良多。</p>
+
+<p>第一个主题演讲是 Ruby 之父 Matz 先生的演讲《Be a lanuage designer》。Matz 的演讲主要有三个部分：
+一是如何成为语言的设计师，设计语言没有大家想象中的那么困难，每个开发者平时设计的代码、API和接口其实都是一门“语言”，如果想要设计一门语言，不妨先从DSL写起；
+二是Ruby 2.0的最新消息，Ruby 2.0 将会在 Ruby 的20岁生日&#8211;2013年2月24日发布，Ruby 2.0 将带来一些非常有意思的特性，比如 Refinement, Module#prepend，Enumerable#lazy 和 Keyword formal Argument等；
+三是 mruby 的最新消息，mruby 可以算是 Ruby 的一个子集，它非常小巧精悍（&lt;500K），适用于嵌入式环境，能够运行于小型设备如智能手机，智能网络路由器和机顶盒等等，还介绍了mruby相关的几个项目如MobiRuby——mruby for iOS，mruby_nginx——Nginx mruby Extension 和 mruby-libuv——适用于mruby的异步I/O。</p>
+
+<p>Matz 每次演讲带来的消息都让人振奋。我已经装了 Ruby 2.0 preview 版本，我想接下来可以花些时间做测试，为帮助 Ruby 2.0的发布尽自己一些贡献。</p>
+
+<p>第二个演讲是Jesse Zhang的《How Cloud Foundry Dit it(With Ruby)》, Jesse 主要介绍了 Cloud Foundry 的技术架构。也许是对 Cloud Foundry 了解不多，觉得讲得内容比较抽象，对整个演讲印象不深，会后和 Jesse 聊了一下，了解到他们使用了 EventMachine，所有使用的 Gem 都必须是 EM 版本的，这给开发带来了不少麻烦。</p>
+
+<p>第三个演讲是黄志敏的《OpenFeint迁移到JRuby经验》，主要内容是OpenFeint 通过迁移到 JRuby 带来了接近 40% 的性能提升，迁移过程的原因考虑，实施方法和遇到的问题。从他介绍看，OpenFeint 之前使用的技术堆栈和薄荷非常接近，所以今后可以对 JRuby 做深入的研究，它也许是解决性能问题一个好方法。</p>
+
+<p>第四个演讲是Fred Wu的《如何成为一名更优秀的 Ruby 程序员》，全英文的演讲，讲了很多方面，印象比较深的是要参与到开源项目中，既能贡献力量，也能让自己成长。这点自己以前做得不太好，从开源界得到的帮助很多，但是为之做的贡献很少，以后要改进。</p>
+
+<p>第五个演讲是陈金洲的《Ruby on Rails 创业团队全技术栈指南》，介绍Ruby on rails部署，监控和架构的技术栈选择，他的演讲非常幽默，常引来满场欢乐。演讲的内容我大都非常熟悉，因为自己都亲身经历过，不过还是蛮有收获，特别是他提到要关注应用层的监控，可以使用 New Relic 和 Scout 进行监控，让我有不少启发，之前对应用层的监控重视不够，做得不好。</p>
+
+<p>第六个演讲是王益善的《Ruby Arduino Hacking》，介绍了什么是 Arduino，用 Arduino 和 Ruby 演示一些有意思的操作，比如唱《两只老虎》，控制台灯什么的，非常好玩。之前对所谓开源硬件缺乏了解，通过他的介绍，让我有了直观的认识，觉得蛮有趣的，以后有空也想折腾一番，呵呵。</p>
+
+<p>第七个演讲是马海波的《程序员如何设计》，从程序员的角度探讨如何学习，应用设计，一个很深的体会是他的 ppt 做的很漂亮，非常有设计感。自己向来对设计心存畏惧，从他的演讲找到了一些信心，以后一定要学一学设计。</p>
+
+<p>最后是一个小演讲，王松林介绍他们在嵌入设备上使用 cruby 和 mruby 的一些经验。</p>
+
+<p>RubyConfChina 大会已经举办了 4 届，这 4 届我都有参加，感觉这一届是过往最热闹，最精彩的一届，可以明显感觉到 Ruby 在中国稳步前行，让我为自己作为一名 Ruby 程序员而自豪。感谢辛勤大会组织者，感谢杰出的演讲者，感谢所有为大会贡献的公司和个人，相信 Ruby 的世界会更美好，中国的 Ruby 更美好。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/12/ruby-block-proc-and-lambda/">Ruby: block proc and lambda</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-12T14:12:00+08:00" pubdate data-updated="true">2012-11-12</time>
+        
+         | <a href="/blog/2012/11/12/ruby-block-proc-and-lambda/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在规则引擎中，Ruby 的闭包使用特别频繁，而且有 block，Proc和 lambda 等后几种形式的用法，很让人困惑。为了深入理解代码，再次认真学习了一下 Ruby 的闭包，特别是 block，proc 和 lambda 几种用法的异同，这次的周记就和大家分享一下心得。</p>
+
+<p>闭包是 Ruby 相对其它语言特别优势之一，很多语言有闭包，但是唯有 Ruby 把闭包的优势发挥得淋漓尽致。Ruby 的哲学之一：同一个问题现实中有多种解决方法，所以 Ruby 中也有多种解法，所以闭包的使用也有多种方法。</p>
+
+<p>先看一个代码的例子：
+Example 1:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">def</span> <span class="nf">foo1</span>
+</span><span class='line'>  <span class="k">yield</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
+</span><span class='line'>  <span class="n">b</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="n">b</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo1 in block&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="n">foo2</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo2 in block&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
+</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
+</span><span class='line'><span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
+</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
+</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>输出：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='sh'><span class='line'>》foo1 in block
+</span><span class='line'>》foo2 in block
+</span><span class='line'>》foo in proc
+</span><span class='line'>》foo in proc
+</span><span class='line'>》foo in lambda
+</span><span class='line'>》foo in lambda
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>大家是不是有些困惑，首先是方法 foo1 和 foo2 都能接收闭包，它们这两种写法有什么区别，然后是作为参数的三种闭包 block，proc和 lambda有什么区别。</p>
+
+<h2>1. yield 和 block call 的区别</h2>
+
+<p>yield 和 block call 两种都能实现运行闭包，从实际运行效果来说，区别不大。其区别主要在于：</p>
+
+<h3>1.1 闭包的传递和保存</h3>
+
+<p>因为闭包已经传递到参数里，所以可以继续传递或保存起来，例如：</p>
+
+<p>Exampl 2:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">class</span> <span class="nc">A</span>
+</span><span class='line'>      <span class="k">def</span> <span class="nf">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
+</span><span class='line'>         <span class="vi">@proc</span> <span class="o">=</span> <span class="n">b</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>      <span class="k">def</span> <span class="nf">foo2</span>
+</span><span class='line'>          <span class="vi">@proc</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="vi">@proc</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">a</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;proc from foo1&quot;</span> <span class="p">}</span>
+</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo2</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h3>1.2 性能</h3>
+
+<p>yield不是方法调用，而是 Ruby 的关键字，yield 要比 block call 比快 1 倍左右。</p>
+
+<h2>2. block 和 proc, lambda 的区别</h2>
+
+<p>很简单直接，引入 proc 和 lambda 就是为了复用，避免重复定义，例如在 example 1 中，使用 proc 变量存储闭包，避免重复定义两个 block 。</p>
+
+<h2>3. proc 和 lambda 的区别</h2>
+
+<p>这大概是最让人困惑的地方，从 Example 1 的行为上看，他们的效果是一致的，为什么要用两种不同的表达方式。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>确实，对于简单的情况，比如 Example 1的情况，他们的行为是一致的，但是主要在两个地方有明显差异：</p>
+
+<h3>1.1 参数检查</h3>
+
+<p>还是例子说话
+Example 3:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
+</span><span class='line'>      <span class="n">x</span> <span class="o">=</span> <span class="mi">100</span>
+</span><span class='line'>      <span class="k">yield</span> <span class="n">x</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>   <span class="n">lambda_proc1</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc1</span><span class="p">)</span>
+</span><span class='line'>   <span class="n">lambda_proc2</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc2</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>输出</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》a is 100 b is nil
+</span><span class='line'>   》a is 100
+</span><span class='line'>   》ArgumentError: wrong number of arguments <span class="o">(</span>1 <span class="k">for </span>2<span class="o">)</span>
+</span><span class='line'>      …
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>    <br/>
+可见，proc 不会对参数进行个数匹配检查，而 lambda 会，如果不匹配还会报异常，所以安全起见，建议优先用 lambda。</p>
+
+<h3>1.2 返回上层</h3>
+
+<p>还是例子说话
+Example 4:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
+</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from foo from inside proc&quot;</span> <span class="p">}</span>
+</span><span class='line'>     <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control leaves foo here</span>
+</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from foo&quot;</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>   <span class="k">def</span> <span class="nf">bar</span>
+</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from lambda&quot;</span> <span class="p">}</span>
+</span><span class='line'>     <span class="nb">puts</span> <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control does not leave bar here</span>
+</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from bar&quot;</span>
+</span><span class='line'>   <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'>   <span class="nb">puts</span> <span class="n">foo</span>
+</span><span class='line'>   <span class="nb">puts</span> <span class="n">bar</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>   输出</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》return from foo from inside proc
+</span><span class='line'>   》return from lambda
+</span><span class='line'>   》return from bar
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p> <br/>
+可见，proc 中，return 相当于执行了闭包环境里的 return，而 lambda 只是返回call 闭包所在环境。</p>
+
+<p><em>总结：闭包是 Ruby 的强大特性，它的几种表达方式block，proc 和 lambda有细微差别，要用好它需要对其深入理解。</em></p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/07/02/wo-men-xing-fu-de-yi-jia/">我们幸福的一家</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-02T17:20:00+08:00" pubdate data-updated="true">2012-07-02</time>
+        
+         | <a href="/blog/2012/07/02/wo-men-xing-fu-de-yi-jia/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>感谢上苍赐予我和爱妻一对健康可爱的儿女。</p>
+
+<p><img src="/images/photos/MG_3473_meitu_1.jpg" alt="Photo1" /></p>
+
+<p>弟弟还小，青禾姐姐要多关心弟弟哦。</p>
+
+<p><img src="/images/photos/MG_3543_meitu_3.jpg" alt="Photo2" /></p>
+
+<p>青禾骑车的姿势很酷吧。</p>
+
+<p><img src="/images/photos/MG_3553_meitu_2.jpg" alt="Photo3" /></p>
+
+<p>直树很醒目的样子。</p>
+
+<p><img src="/images/photos/MG_3645_meitu_1.jpg" alt="Photo4" /></p>
+
+<p>青禾在大声呼喊，啊～～</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/07/02/ruby-p-vs-puts/">Ruby 中的 p 和 puts</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-02T10:41:00+08:00" pubdate data-updated="true">2012-07-02</time>
+        
+         | <a href="/blog/2012/07/02/ruby-p-vs-puts/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>p 和 puts 是 Ruby 中特别常用的方法，很多童鞋可能认为它们是差不多的，使用的时候也不加注意，但是仔细考究起来，它们是有明显差别的。</p>
+
+<p>先举一个例子</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">Foo</span>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">inspect</span>
+</span><span class='line'>      <span class="s2">&quot;foo from inspect&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">to_s</span>
+</span><span class='line'>      <span class="s2">&quot;foo from to_s&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">foo</span> <span class="o">=</span> <span class="no">Foo</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="nb">p</span> <span class="n">foo</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="n">foo</span>
+</span><span class='line'>  <span class="nb">p</span> <span class="s2">&quot;p: &lt;</span><span class="si">#{</span><span class="n">foo</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;p: &lt;</span><span class="si">#{</span><span class="n">foo</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这段代码的输出是</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">foo</span> <span class="n">from</span> <span class="nb">inspect</span>
+</span><span class='line'><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span>
+</span><span class='line'><span class="nb">p</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span><span class="o">&gt;</span>
+</span><span class='line'><span class="nb">puts</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span><span class="o">&gt;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><code>p obj</code> 相当于 <code>puts obj.inspect</code>，而 <code>puts obj</code> 相当于 <code>puts obj.to_s</code>，
+使用的方便是明显区别的，p 是使用 obj 的 inspect 方法，而 puts 是 to_s 方法。</p>
+
+<p>为什么会这样呢？这个我想可以从 to_s 和 inspect 的区别说起，to_s 是对象的字符串表示，
+是 puts 和双引号字符使用的方法。inspect 是对象状态的表示，通用用于 debug 中。
+Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类名和地址。</p>
+
+<p>所以p 和 puts主要是用途的不同，p 是作为 debug 输出，而 puts 作为对象的字符串表示输出。</p>
+
+<p>另外值得一提的是，在 irb console 中，命令行中表达式求值，使用的是 p 对象的 inspect 方法。另外，通常 debug 输出命令，也是使用对象的 inspect 方法。</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/06/16/proxychains-svn/">使用 proxychains 访问远程 svn 服务器</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-06-16T00:51:00+08:00" pubdate data-updated="true">2012-06-16</time>
+        
+         | <a href="/blog/2012/06/16/proxychains-svn/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>有多种方法能让 svn 访问远程内部 svnserv 服务器.</p>
+
+<p>一是使用 svn+ssh://&#8230; 形式的 repos url，这种方法简单便捷，缺点是内外网访问使用的 repos url 不一致，需要建立多个 work copy，
+而且使用 svn+ssh:// 时，使用的 svn 用户为 ssh 的用户。</p>
+
+<p>二是使用 vpn，缺点在于建立 vpn 比较麻烦，特别是 vpn 需要服务器和路由器的支持，常常会出现无法使用的情况。</p>
+
+<p>三是使用 ssh tunnel 和 proxychains 建立 svn 到远程内部 svn 服务器的通信通道，这种方法可以使 work copy 一致，svn 用户一致，麻烦
+的地方在于需要额外安装一个软件 proxychains，使用时必须启用 ssh tunnel 和 wrap svn 命令。</p>
+
+<p>下面详细介绍第三种方法的使用。</p>
+
+<p>1.安装 proxychains 软件。下载 proxychains 代码（目前最新是3.1），如果是 Mac 系统还要对代码加一个补丁
+   参见：<a href="http://chrootlabs.org/bgt/proxychains_osx.html">ProxyChains for Mac OS X patch</a></p>
+
+<p>   需要特别注意的是，使用的时候请更改执行脚本 proxychains 中 DYLD_INSERT_LIBRARIES 为正确的路径。</p>
+
+<p>2.启用 ssh tunnel。执行一个命令即可，例如</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>   ssh -Nf &lt;user&gt;@&lt;host&gt; -D 127.0.0.1:9050
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p> <br/>
+   为方便使用，可把它放到一个 shell 文件中。</p>
+
+<p>3.wrap svn命令。
+   使用方法是每个svn命令前加上 proxychains 即可，例如</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>   proxychains svn up
+</span><span class='line'>   proxychains svn commit
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>   为避免每次使用都敲一次 proxychains，可以建立一个 alias。
+   在 ~/.bash_profile 中增加一行</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>   <span class="sb">`</span><span class="nb">alias </span><span class="nv">psvn</span><span class="o">=</span><span class="s2">&quot;/opt/local/bin/proxychains svn&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>
+这样就可以使用下面简单的命令了：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>  psvn up
+</span><span class='line'>  psvn commit
+</span><span class='line'>  psvn stat -r
+</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  <div class="pagination">
+    
+    <a href="/blog/archives">Blog Archives</a>
+    
+    <a class="next" href="/">Newer &rarr;</a>
+    
+  </div>
+</div>
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        var disqus_script = 'count.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: "Design | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/-design/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-06-23T21:46:55+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[重构 NICE 方案程序]]></title>
+    <link href="http://xiewenwei.github.com//blog/2012/12/16/refactor-nice-program/"/>
+    <updated>2012-12-16T22:42:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2012/12/16/refactor-nice-program</id>
+    <content type="html"><![CDATA[<p>最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。</p>
+
+<p>NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码，简单的说就是把生成工作分解成多个步骤，为每一个步骤定义一个方法，然后在一个主控方法中分别调用各个方法。这看起来是比较简单的，但是升级维护变得很困难，比如要增加一个新版本的方案生成方法，不得不在代码中很多地方加入 <code>if else</code> 判断。</p>
+
+<p>这次的工作就是要增加一个新版本的 NICE 方案生成方法，而且要求对之前的所有方案生成提供兼容。考虑再三，不打算在之前的代码上增加许多 <code>if else</code> 完成工作，于是对整个生成代码做一次大的重构。</p>
+
+<p>从工厂流水线的工作方式得到启发，感觉 NICE 的评测和方案生成就象是流水线作业。NICE 评测从输入到评测报告的过程，可以抽象为 input 经过一系列的 analyzer 的处理，最后得到一个 evaluation result的过程。而 NICE 方案可以抽象为，输入是 input 和评测报告，经过一系列 builder 的处理，最后得多一个 solution result.</p>
+
+<p>重构后，NICE 评测生成过程的核心类图如下：
+<img src="/images/house/analyzer.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<p>```ruby</p>
+
+<pre><code>  result = EvaluationResult.new
+  # Order of analyzer must be restricted
+  [ 
+    Evaluation::BodyAnalyzer,
+    Evaluation::TagAnalyzer,
+    Evaluation::TipAnalyzer
+  ].each { |analyzer| analyzer.new(input, result).analyze }
+
+  # save result ...
+</code></pre>
+
+<p>```</p>
+
+<p>评测分析过程基类是 Analyzer，BodyAnalyzer，TagAnalyzer 和 TipAnalyzer 都从它继承而来，每一个 Analyzer 完成一部分的评测分析工作。重构之后，扩展评测变得很容易，只要增加一种特定的 Analyzer 即可，而且这个 Analyzer 完全可以从之前的 Analyzer 继承已达到代码复用。</p>
+
+<p>重构后，NICE 方案生成过程的核心类图如下：
+<img src="/images/house/builder.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<p>```ruby</p>
+
+<pre><code>  result = SolutionResult.new      
+  input_wrapper = Solution::InputWrapper.new(input)
+  # Order of builder must be restricted
+  [
+    Solution::PreparingBuilder,
+    Solution::WeekPlanBuilder, 
+    Solution::EatTipBuilder,       
+    Solution::ActivityPlanBuilder,        
+    Solution::ActTipBuilder,
+    Solution::NoticeBuilder
+  ].each do |builder|
+    builder.new(input_wrapper, result).build
+  end
+
+  # save result ...
+</code></pre>
+
+<p>```</p>
+
+<p>方案生成过程基类是 Builder，PreparingBuilder，WeekPlanBuilder 和 NoticeBuilder 都从它继承而来，每一个 Builder 完成一部分的方案生成工作。</p>
+
+<p>流水线作业的设计模式很适合象 NICE 方案生成的工作，它的特点是：整体过程复杂，可以分解为多个类似的步骤，这些步骤共享相同的输入和输出对象。使用这种设计模式后，代码结果变成简单清晰，而且易于扩展维护。</p>
+]]></content>
+  </entry>
+  
+</feed>

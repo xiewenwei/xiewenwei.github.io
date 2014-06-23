@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: redis | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/redis/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-06-23T21:46:55+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[保护 Redis 的数据]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/06/16/redis-data-protection/"/>
+    <updated>2014-06-16T00:08:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/06/16/redis-data-protection</id>
+    <content type="html"><![CDATA[<p>Redis 是非常流行的 key-value 类型的 NOSQL 数据库，它的 value 数据类型丰富多样，适合解决很多对关系数据库来说棘手的问题。Redis 是内存数据库，也就是说它把所有的数据都放在内存中。众所周知，当前机器突然断电或者系统异常崩溃时，内存的数据会丢失的，所以如果把系统的关键数据放在 Redis 中必须做好保护措施。</p>
+
+<p>Redis 提供了两种持久化数据机制：</p>
+
+<p>一种是 RDB 机制。这种方式是把当前整个 Redis 内存数据快照写到磁盘上。优点是比较简单，恢复快速。缺点是代价比较昂贵，尤其当数据量很大时，会严重影响到 Redis（照成 Redis 停顿），而且会极度消耗磁盘 IO。</p>
+
+<p>另一种是 AppendOnly 机制。这种方式类似于 log，把数据操作命令全部存入 log 文件。优点是每段时间写入数据不是很大，可以设置很短的写入时间间隔（比如1秒钟）。缺点是 log 文件可能会远大于数据文件，通常会是数据文件大小的 3~5 倍，而且恢复的时间要远大于 RDB 方式的恢复时间。</p>
+
+<p>这两种机制各有优劣，不过它们是可以结合起来使用的。在实际使用过程，通常还结合 Redis 的 slave 功能，做到对 Redis 影响更小，保护更充分。具体的做法是对 Redis 建立 master 和 slave，在 master 上根本不使用任何持久化机制，只在 slave 上建立结合 RDB 和 AppendOnly 的持久化机制。</p>
+]]></content>
+  </entry>
+  
+</feed>

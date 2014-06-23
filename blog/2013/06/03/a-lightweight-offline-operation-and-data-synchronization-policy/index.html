@@ -1,0 +1,260 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>一种轻量的移动应用离线操作和数据同步策略 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="对移动应用而言，离线操作和数据同步是一件烦人的事情，组合使用本地数据，远程数据缓存和服务请求暂存的策略，可以使之变得比较轻松简单。 使用本地数据 为了 app 在离线状态下部分功能依然能够使用，可以把部分数据直接和应用打包在一起发布。这样当应用检测到网络不通时，可以使用本地数据。 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">一种轻量的移动应用离线操作和数据同步策略</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-06-03T22:58:00+08:00" pubdate data-updated="true">2013-06-03</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>对移动应用而言，离线操作和数据同步是一件烦人的事情，组合使用本地数据，远程数据缓存和服务请求暂存的策略，可以使之变得比较轻松简单。</p>
+
+
+
+
+<h2>使用本地数据</h2>
+
+
+
+
+<p>为了 app 在离线状态下部分功能依然能够使用，可以把部分数据直接和应用打包在一起发布。这样当应用检测到网络不通时，可以使用本地数据。比如对于食物查询功能，在网络通的时候是请求服务器完成查询的，当网络不通时，就使用本地的数据做查询。使用本地数据有两个制约，一是本地数据不能太大，太大的话应用打包后的体积会很大；二是本地数据的功能有所限制。比如对于食物查询而言，通过请求服务器完成时可以使用比较智能的搜索，使用本地查询的化就只能使用简单的文本匹配了。所以在离线操作时，需要提示用户使用的是本地数据，功能所限，联网使用的话才能使用完整功能。</p>
+
+
+
+
+<h2>远程数据缓存</h2>
+
+
+
+
+<p>因为本地数据有很多限制，数量不全，然后内容也不全，使用远程数据缓存可以减轻本地数据的限制。比如，食物数据只包括了最基本的名称和单位热量数据，没有包括额外的介绍、评价等数据。但是用户已经查询的食物数据可以缓存起来，离线操作查询的时候也可以显示这些信息。另外，缓存数据的一大好处是能大幅提高应用的性能。毕竟大部分操作是以读为主的，数据的变化也不是很频繁，如果利用缓存的话，能够大幅减少请求次数和网络带宽。</p>
+
+
+
+
+<h2>暂存数据操作请求</h2>
+
+
+
+
+<p>对于写请求的操作，在离线的时候，可以简单的把整个请求 URL 和 参数先保存起来，等到网络通了只会，再依次按顺序发送给服务器完成操作。这种方法，对比应用和服务器之间互相跟踪数据变化记录，然后根据变化记录操作数据的方法，要简单得多，而且如果中间出现问题，故障处理也要简单可靠的多。</p>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-06-03T22:58:00+08:00" pubdate data-updated="true">2013-06-03</time>
+      
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2013/05/25/ruby-multiple-threads-potential-and-weakness/" title="Previous Post: 实例说明 Ruby 多线程的潜力和弱点">&laquo; 实例说明 Ruby 多线程的潜力和弱点</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2014/01/05/multiple-rubies-and-gems-test-solution/" title="Next Post: 多 Ruby 版本和 多 Gem 版本测试">多 Ruby 版本和 多 Gem 版本测试 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

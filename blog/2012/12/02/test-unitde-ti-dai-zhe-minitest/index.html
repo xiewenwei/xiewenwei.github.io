@@ -1,0 +1,312 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>TestUnit的替代者MiniTest - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="MiniTest 是新一代的 Ruby 测试框架，它已经成为 Ruby 1.9 的内置测试框架，据说它也将成为Rails 4的默认测试框架，可谓前途一片光明。 MiniTest 为什么成为最新 Ruby 和 Rails 的首选，它有哪些吸引人的东西呢？ Ruby 1.8时代，Ruby 和 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">TestUnit的替代者MiniTest</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-02T22:07:00+08:00" pubdate data-updated="true">2012-12-02</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>MiniTest 是新一代的 Ruby 测试框架，它已经成为 Ruby 1.9 的内置测试框架，据说它也将成为Rails 4的默认测试框架，可谓前途一片光明。</p>
+
+<h2>MiniTest 为什么成为最新 Ruby 和 Rails 的首选，它有哪些吸引人的东西呢？</h2>
+
+<p>Ruby 1.8时代，Ruby 和 Rails 的默认测试框架都是 TestUnit，TestUnit 历史悠久，它最大的问题是太慢，太臃肿了，它包含了一堆现在很少使用的第三方库，比如GTk v1, GTk v2, FxRuby，另外一个大问题的是它缺乏一些基本的测试特性，比如 spec DSL的测试风格，比如 mock 支持等等。</p>
+
+<p>MiniTest 相当于对 TestUnit 做了一次大的重构翻新，它继承了 TestUnit 大部分用法，消除 TestUnit 中不恰当的依赖，另外增加了基本的测试特性，比如 spec 和 mock等，整体上变得相当快速，简单整洁。</p>
+
+<p>在 Ruby 和 Rails 的世界，有一个测试框架 Rspec 使用也是非常广泛的，甚至目前使用广泛程度超过 TestUnit 和 MiniTest，它为什么没有成为默认框架呢？我想 MiniTest 相对于 Rspec 最大的优势是简单和延续性，Rspec 相比 MiniTest 要庞大复杂得多，当然功能也更强大，对于内置 Ruby 的类库来说，还是简单和保持延续（相对 TestUnit）更有优势。对于 Rails 来说，Rails 之父 DHH 和 Rspec 一直对不上眼，我想是 Rails 最终选择 MiniTest 最大的原因，哈哈。</p>
+
+<h2>MiniTest 使用示例</h2>
+
+<p>如果你用过 TestUnit，MiniTest 使用非常简单，下面是一个测试的 Hello World</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">HelloWold</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">get_word</span>
+</span><span class='line'>    <span class="s2">&quot;Hello World!&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>测试代码</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;minitest/autorun&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">HelloWoldTest</span> <span class="o">&lt;</span> <span class="no">MiniTest</span><span class="o">::</span><span class="no">Unit</span><span class="o">::</span><span class="no">TestCase</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">test_get_word</span>
+</span><span class='line'>    <span class="n">assert_equal</span> <span class="s2">&quot;Hello World!&quot;</span><span class="p">,</span> <span class="no">HelloWold</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">get_word</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>测试代码, spec风格</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;minitest/autorun&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">describe</span> <span class="no">HelloWold</span> <span class="k">do</span>
+</span><span class='line'>  <span class="n">it</span> <span class="s2">&quot;should return hello world&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="no">HelloWold</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">get_word</span><span class="o">.</span><span class="n">must_equal</span> <span class="s2">&quot;Hello World!&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><strong>如果要在 Rails 项目使用 MiniTest，可以使用 gem minitest-rails</strong>，使用 <code>minitest-rails</code> 之后，rails generator 生成的 test 就都转换为 minitest 风格代码。</p>
+
+<h2>总结</h2>
+
+<p>MiniTest 相当简单快速，它延续 TestUnit用法，上手非常快，同时它又提供了一些非常棒的特性，试用下来觉得非常不错，难怪它成为最新 Ruby 和 Rails 的首选，我打算今后就用它了。</p>
+
+<h2>参考资料</h2>
+
+<ol>
+<li><a href="https://github.com/seattlerb/minitest">minitest home</a></li>
+<li><a href="https://github.com/blowmage/minitest-rails">minitest-rails home</a></li>
+</ol>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-02T22:07:00+08:00" pubdate data-updated="true">2012-12-02</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/ruby/'>Ruby</a>, <a class='category' href='/blog/categories/test/'>Test</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/" title="Previous Post: Ruby的运算符和语句优先级">&laquo; Ruby的运算符和语句优先级</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2012/12/09/ruby-constant-lookup/" title="Next Post: Ruby 常量查找路径">Ruby 常量查找路径 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

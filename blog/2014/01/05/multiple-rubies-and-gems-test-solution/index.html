@@ -1,0 +1,281 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>多 Ruby 版本和 多 Gem 版本测试 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="admin_gateway 是用于我们所有后台统一认证和授权的组件，而我们后台程序运行在多个 Ruby 版本上，主要是 Ruby 1.9.3 和 2.0，Ruby 2.1 也已经发布了，很快也需要提供 Ruby 2.1 的支持，另外 Rails 版本有 3.0，3.2 和 4.0 三大主要版本， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/01/05/multiple-rubies-and-gems-test-solution/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">多 Ruby 版本和 多 Gem 版本测试</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-01-05T22:58:00+08:00" pubdate data-updated="true">2014-01-05</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>admin_gateway 是用于我们所有后台统一认证和授权的组件，而我们后台程序运行在多个 Ruby 版本上，主要是 Ruby 1.9.3 和 2.0，Ruby 2.1 也已经发布了，很快也需要提供 Ruby 2.1 的支持，另外 Rails 版本有 3.0，3.2 和 4.0 三大主要版本，因此一个完整的测试方案是需要包括这 3 * 3 = 9 种组合才行。</p>
+
+<p>首先是多个 Ruby 版本测试。这个问题比较简单，我们现在的 Ruby 环境通常是由 RVM 管理的，RVM 可以很容易的以多个 Ruby 版本重复执行 Ruby 程序，比如下面的例子：
+<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec ruby -e "puts RUBY_VERSION"</code>
+如果运行的机器安装了这3个版本的 Ruby 的话，就会依次执行打出各自的 Ruby 版本号。
+所以下面的命令就可以依次运行3个Ruby版本的测试了：</p>
+
+<p><code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install</code>
+<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code></p>
+
+<p>解决多 Ruby 版本测试的问题，然后就是多 Rails 版本测试的问题。admin_gateway 这个 gem 是一个 Rails Engine，因此需要依赖 Rails。多 Rails 版本测试意味着 test 的 gem 环境是不同的，而现在 gem 环境是由 bundle 管理的，运行 bundle 命令时可以手动指定 Gemfile 文件，因此 建立多个 Gemfile 文件，重复上面的命令就可以了，例如可以建立 rails_4_0.gemfile 这个 Gemfile，然后通过命令
+<code>bundle install --gemfile rails_4_0.gemfile</code>
+执行 gem 环境安装，
+然后通过命令：
+<code>BUNDLE_GEMFILE=rails_4_0.gemfile bundle exec rake test</code>
+执行测试。</p>
+
+<p>组合上面的方法，可以形成一个完整的多 Ruby 版本和 Rails 版本的解决方案：
+1. 首先根据需要安装多个 Ruby 版本，如 ruby 1.9.3, 2.0.0 和 2.1.0，根据需要生成多个 gemfile，如 rails_3_0.gemfile, rails_3_2.gemfile 和 rails_4_0.gemfile
+2. 然后使用下面的 shell 安装 gem 环境和运行测试。
+<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install --gemfile=rails_3_0.gemfile</code>
+<code>BUNDLE_GEMFILE=rails_3_0.gemfile rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code>
+3.2 和 4.0的类似，就不重复了。</p>
+
+<p>解决 gem 多版本的方法有一点不干净，因为 gemfile 有很多重复内容，shell命令也比较重复，因此有一个 gem 叫 appraise （https://github.com/cfedermann/Appraise）就是用于解决这个问题，它只需要配置一个 Appraisals 文件，在 Appraisals 声明不同的 gem 依赖就可以了，比如 admin_gateway 的 Appraisals 内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>appraise "rails-3-0" do
+</span><span class='line'>  gem "rails", "3.0.20"
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>appraise "rails-3-2" do
+</span><span class='line'>  gem "rails", "3.2.16"
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>appraise "rails-4-0" do
+</span><span class='line'>  gem "rails", "4.0.0"
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后就可以通过 rake appraisal 完成多个 rails 版本测试，它的原理和上面提到的完全一样。</p>
+
+<p>总之，多 Ruby 版本和多 gem 版本的测试并不难，利用 rvm 和 bundle 一些特性可以快速做到，利用 appraisal 可以让其更简化。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-01-05T22:58:00+08:00" pubdate data-updated="true">2014-01-05</time>
+      
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/" title="Previous Post: 一种轻量的移动应用离线操作和数据同步策略">&laquo; 一种轻量的移动应用离线操作和数据同步策略</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/" title="Next Post: Ruby on Rails 线程安全代码">Ruby on Rails 线程安全代码 &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些深坑</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/08/sharding-redis-instance/">分割 Redis 实例</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/01/05/multiple-rubies-and-gems-test-solution/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/01/05/multiple-rubies-and-gems-test-solution/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>
