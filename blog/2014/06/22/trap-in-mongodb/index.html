@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。 MongoDB &hellip;">
+  <meta name="description" content="MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。特别申明： &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -96,7 +96,7 @@
   </header>
 
 
-<div class="entry-content"><p>MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。</p>
+<div class="entry-content"><p>MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。特别申明：我们目前用的 MongoDB 版本是 2.4.10，曾经升级到 MongoDB 2.6.0 版本，问题依然存在，又回退到 2.4.10 版本。</p>
 
 <h2>MongoDB 数据库级锁</h2>
 
@@ -124,7 +124,8 @@
 <p>上面提到了 MongoDB 库级锁的问题，建索引就是一个容易引起长时间写锁的问题，MongoDB 在前台建索引时需要占用一个写锁（而且不会临时放弃），如果集合的数据量很大，建索引通常要花比较长时间，特别容易引起问题。</p>
 
 <p>解决的方法很简单，MongoDB 提供了两种建索引的访问，一种是 background 方式，不需要长时间占用写锁，另一种是非 background 方式，需要长时间占用锁。使用 background 方式就可以解决问题。
-例如，为超大表 posts 建立索引，<strong><em>千万不用使用</em></strong></p>
+例如，为超大表 posts 建立索引，
+<strong><em>千万不用使用</em></strong></p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 </pre></td><td class='code'><pre><code class='javascript'><span class='line'><span class="nx">db</span><span class="p">.</span><span class="nx">posts</span><span class="p">.</span><span class="nx">ensureIndex</span><span class="p">({</span><span class="nx">user_id</span><span class="o">:</span> <span class="mi">1</span><span class="p">})</span>
@@ -170,17 +171,17 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
 </span><span class='line'><span class="k">class</span> <span class="nc">GroupRequest</span>
 </span><span class='line'>  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
 </span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
-</span><span class='line'>  <span class="n">embeds_in</span> <span class="ss">:group</span>
+</span><span class='line'>  <span class="n">embedded_in</span> <span class="ss">:group</span>
 </span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
 </span><span class='line'><span class="k">end</span>
 </span></code></pre></td></tr></table></div></figure>
 
 
-<p>这个使用方式让我们掉到坑里了，差点就爬不出来，它导致有接近两周的时间系统不问题，高峰时段常有几分钟的系统卡顿，最严重一次甚至引起 MongoDB 宕机。</p>
+<p>这个使用方式让我们掉到坑里了，差点就爬不出来，它导致有接近两周的时间系统问题，高峰时段常有几分钟的系统卡顿，最严重一次甚至引起 MongoDB 宕机。</p>
 
-<p>仔细分析后，发现某些活跃的 Group 的 group_requests 增加（当有新申请时）和更改（当通过或拒绝用户申请时）异常频繁，而这些操作经常长时间占用写锁，导致整个数据库阻塞。原因是当有增加 group_request 操作时，Group 预分配的空间不够，需要重新分配空间（内存和硬盘都需要），耗时较长，另外 Group 上建的索引很多，移动 Group 位置导致大量索引更新操作，也很耗时，综合起来引起了长时间占用锁问题。</p>
+<p>仔细分析后，发现某些活跃的 Group 的 group_requests 增加（当有新申请时）和更改（当通过或拒绝用户申请时）异常频繁，而这些操作经常长时间占用写锁，导致整个数据库阻塞。原因是当有增加 group_request 操作时，Group 预分配的空间不够，需要重新分配空间（内存和硬盘都需要），耗时较长，另外 Group 上建的索引很多，移动 Group 位置导致大量索引更新操作也很耗时，综合起来引起了长时间占用锁问题。</p>
 
-<p>解决问题的方法，说起来也简单，就是把 embed 关联更改成的普通外键关联，就是类似关系数据库的做法，这样 group_request 增加或修改都只发送在 GroupRequest 上，简单快速，避免长时间占用写锁问题。当关联对象的数据不固定或者经常发生变化时，一定要避免使用 embed 关联，不然会死的很惨。</p>
+<p>解决问题的方法，说起来也简单，就是把 embed 关联更改成的普通外键关联，就是类似关系数据库的做法，这样 group_request 增加或修改都只发生在 GroupRequest 上，简单快速，避免长时间占用写锁问题。当关联对象的数据不固定或者经常发生变化时，一定要避免使用 embed 关联，不然会死的很惨。</p>
 
 <h2>不合理使用 Array 字段</h2>
 
@@ -207,7 +208,7 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
 
 <p>User 中通过一个 Array 类型字段 follower_user_ids 保存用户关注的人的 id，用户关注的人从 10个到 3000 个不等，变化是比较频繁的，和上面 embed 引发的问题类似，频繁的 follower_user_ids 增加修改操作导致大量长时间数据库写锁，从而引发 MongoDB 数据库性能急剧下降。</p>
 
-<p>解决问题的方法：我们把 follower_user_ids 转移到了内存数据 redis 中，避免了频繁更改 MongoDB 中的 User, 从而彻底解决了问题。如果不使用 redis，也可以建立一个 UserFollower 集合，使用外键形式关联。</p>
+<p>解决问题的方法：我们把 follower_user_ids 转移到了内存数据库 redis 中，避免了频繁更改 MongoDB 中的 User, 从而彻底解决问题。如果不使用 redis，也可以建立一个 UserFollower 集合，使用外键形式关联。</p>
 
 <p>先列举上面几个坑吧，都是害人不浅的陷阱，使用 MongoDB 过程一定要多加注意，避免掉到坑里。</p>
 
