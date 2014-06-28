@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。 NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码， &hellip;">
+  <meta name="description" content="这几天对一个大型的 Rails 项目做 Ruby 升级，把升级过程中遇到的几个主要问题和解决方法记录下来以备参考。 1. 带中文字符的源代码需要加上 utf-8 encoding 声明 在 Ruby 1.9 中，如果源代码中包含中文字符，必须声明源代码文件的字符集， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,128 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/01/03/update-ruby-1-8-to-1-9/">升级 Ruby 1.8.7 到 1.9.3</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-01-03T22:52:00+08:00" pubdate data-updated="true">2013-01-03</time>
+        
+         | <a href="/blog/2013/01/03/update-ruby-1-8-to-1-9/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>这几天对一个大型的 Rails 项目做 Ruby 升级，把升级过程中遇到的几个主要问题和解决方法记录下来以备参考。</p>
+
+<h2>1. 带中文字符的源代码需要加上 utf-8 encoding 声明</h2>
+
+<p>在 Ruby 1.9 中，如果源代码中包含中文字符，必须声明源代码文件的字符集，具体做法是在文件头部增加一个注释行：
+<code># encoding: utf-8</code>。</p>
+
+<p>做法很简单，但是当文件量很大时，一个一个手工修改文件也很麻烦，好在有一个 gem &#8211; magic_encoding 可以轻易解决这个烦恼。用法相当简单，通过 <code>gem install magic_encoding</code> 安装 gem，然后在 Rails 项目目录下执行 <code>magic_encoding</code> 命令，它自动把 Rails 项目所有源代码文件头部加上 <code># -*- encoding : utf-8 -*-</code>，非常简单方便。</p>
+
+<p>参考：<a href="https://github.com/m-ryan/magic_encoding">magic_encoding in github</a></p>
+
+<h2>2. 改变 <code>case var when value :</code> 用法</h2>
+
+<p>在 Ruby 1.9 中，象下面这种 case when 语法已经不支持</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">case</span> <span class="n">var</span>
+</span><span class='line'>    <span class="k">when</span> <span class="mi">1</span><span class="p">:</span>
+</span><span class='line'>      <span class="s2">&quot;value of 1&quot;</span>
+</span><span class='line'>    <span class="k">when</span> <span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">:</span>
+</span><span class='line'>      <span class="s2">&quot;value of 2 and 3&quot;</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>      <span class="s2">&quot;others&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>修改很简单，把 <code>when value</code> 后的冒号去掉就行了。</p>
+
+<h2>3. 字符串字符集问题</h2>
+
+<p>在 Ruby 1.9 中，字符串对象带有字符集属性，不同字符集的字符串之间拼接会报异常，通常我们都是用 utf-8 encoding 的字符串，但有些类库返回的字符串返回的字符串并非 utf-8 encoding，这时候可能导致问题，需要做一些额外处理。</p>
+
+<p>例如，Base64 解码后的字符串并不是 utf-8 的，拼接会报异常，需要做一次 force_encoding，看下面的代码。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;base64&#39;</span>
+</span><span class='line'><span class="n">s1</span> <span class="o">=</span> <span class="s2">&quot;薄荷网&quot;</span>
+</span><span class='line'><span class="nb">puts</span> <span class="n">s1</span><span class="o">.</span><span class="n">encoding</span><span class="o">.</span><span class="n">to_s</span>
+</span><span class='line'><span class="n">s2</span> <span class="o">=</span> <span class="no">Base64</span><span class="o">.</span><span class="n">encode64</span><span class="p">(</span><span class="n">s1</span><span class="p">)</span>
+</span><span class='line'><span class="n">s3</span> <span class="o">=</span> <span class="no">Base64</span><span class="o">.</span><span class="n">decode64</span><span class="p">(</span><span class="n">s2</span><span class="p">)</span>
+</span><span class='line'><span class="nb">puts</span> <span class="n">s3</span><span class="o">.</span><span class="n">encoding</span><span class="o">.</span><span class="n">to_s</span>
+</span><span class='line'><span class="n">s4</span> <span class="o">=</span> <span class="n">s3</span><span class="o">.</span><span class="n">force_encoding</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+</span><span class='line'><span class="nb">puts</span> <span class="n">s4</span><span class="o">.</span><span class="n">encoding</span><span class="o">.</span><span class="n">to_s</span>
+</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">s3</span><span class="si">}</span><span class="s2">很棒&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>结果是</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">UTF</span><span class="o">-</span><span class="mi">8</span>
+</span><span class='line'><span class="no">ASCII</span><span class="o">-</span><span class="mi">8</span><span class="no">BIT</span>
+</span><span class='line'><span class="no">UTF</span><span class="o">-</span><span class="mi">8</span>
+</span><span class='line'><span class="no">Encoding</span><span class="o">::</span><span class="no">CompatibilityError</span><span class="p">:</span> <span class="n">incompatible</span> <span class="n">character</span> <span class="n">encodings</span><span class="p">:</span> <span class="no">ASCII</span><span class="o">-</span><span class="mi">8</span><span class="no">BIT</span> <span class="ow">and</span> <span class="no">UTF</span><span class="o">-</span><span class="mi">8</span>
+</span><span class='line'>  <span class="n">blabla</span> <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>所以在 Base64 处理字符串的地方要相当小心。</p>
+
+<h2>4. YAML 引擎改变引起的问题</h2>
+
+<p>Ruby 1.9.3 中，YAML 引擎 由 Syck 改成了 Psych，Psych 和 Syck 在处理 UTF-8 字符串时有明显的区别，详见 <a href="http://galeki.is-programmer.com/posts/32636">Psych、Syck、YAML 和编码</a></p>
+
+<p>总结：把 Ruby 从 1.8 升级到 1.9 还是比较轻松的，遇到的问题比想象中少，而且解决起来都不算麻烦。Ruby 兼容性方法做得很棒，赞一个。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1352,6 +1474,10 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/06/28/2014-boohee-jobs/">【上海】薄荷科技长期寻找靠谱的 Ruby, Web 前端，iOS 和 Android 工程师</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a>
       </li>
     
@@ -1365,10 +1491,6 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
     
       <li class="post">
         <a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/01/12/thread-safety-code-for-ruby-on-rails/">Ruby on Rails 线程安全代码</a>
       </li>
     
   </ul>
