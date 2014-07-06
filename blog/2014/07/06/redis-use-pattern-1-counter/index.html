@@ -186,11 +186,30 @@
 
 <p>有时候需要维护大量计数器，比如每一个论坛主题的查看数，比如每一个用户访问页面次数，因为论坛主题和用户基数可能很大，直接基于论坛主题或用户 ID 生成计数器的话，占用 Redis 资源还是相当可观的，这时可以用 Hash 数据类型压缩所需资源。</p>
 
-<p>比如，对应论坛主题查看计数，可以由模式
-  <code>key: topic:&lt;topic_id&gt;:views value: view count (integer)</code>
-  转换为模式
-  <code>key: topic:views  value: hash</code>
-  <code>hash key: &lt;topic_id&gt; hash value: view count (integer)</code></p>
+<p>比如，对应论坛主题查看计数，可以由模式</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">key</span><span class="p">:</span> <span class="n">topic</span><span class="p">:</span><span class="o">&lt;</span><span class="n">topic_id</span><span class="o">&gt;</span><span class="ss">:views</span>
+</span><span class='line'>  <span class="n">value</span><span class="p">:</span> <span class="n">view</span> <span class="n">count</span> <span class="p">(</span><span class="n">integer</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>
+转换为模式：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">key</span><span class="p">:</span> <span class="n">topic</span><span class="ss">:views</span>
+</span><span class='line'>  <span class="n">value</span><span class="p">:</span> <span class="nb">hash</span>
+</span><span class='line'>    <span class="nb">hash</span> <span class="n">key</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">topic_id</span><span class="o">&gt;</span>
+</span><span class='line'>    <span class="nb">hash</span> <span class="n">value</span><span class="p">:</span> <span class="n">view</span> <span class="n">count</span> <span class="p">(</span><span class="n">integer</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>总结：利用 Redis 实现计数器，可以简单高效实现各种计数功能。</p>
 </div>
 
 

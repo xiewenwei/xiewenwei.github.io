@@ -4,7 +4,7 @@
   <title><![CDATA[Category: pattern | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/pattern/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-07-07T00:15:25+08:00</updated>
+  <updated>2014-07-07T00:18:53+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -84,10 +84,22 @@ end
 <p>有时候需要维护大量计数器，比如每一个论坛主题的查看数，比如每一个用户访问页面次数，因为论坛主题和用户基数可能很大，直接基于论坛主题或用户 ID 生成计数器的话，占用 Redis 资源还是相当可观的，这时可以用 Hash 数据类型压缩所需资源。</p>
 
 <p>比如，对应论坛主题查看计数，可以由模式
-  <code>key: topic:&lt;topic_id&gt;:views value: view count (integer)</code>
-  转换为模式
-  <code>key: topic:views  value: hash</code>
-  <code>hash key: &lt;topic_id&gt; hash value: view count (integer)</code></p>
+<code>
+  key: topic:&lt;topic_id&gt;:views
+  value: view count (integer)
+</code><br/>
+转换为模式：
+```
+  key: topic:views<br/>
+  value: hash</p>
+
+<pre><code>hash key: &lt;topic_id&gt; 
+hash value: view count (integer)
+</code></pre>
+
+<p>```</p>
+
+<p>总结：利用 Redis 实现计数器，可以简单高效实现各种计数功能。</p>
 ]]></content>
   </entry>
   
