@@ -4,7 +4,7 @@
   <title><![CDATA[Category: redis | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/redis/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-07-07T00:18:53+08:00</updated>
+  <updated>2014-07-07T00:21:52+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -57,7 +57,7 @@
 
 <p>```ruby
   # 每秒最大请求数
-  MAX_REQUEST_PER_SECOND = 10</p>
+  MAX_REQUESTS_PER_SECOND = 10</p>
 
 <p>  # 检查 ip 请求限制
   # @param ip
@@ -69,7 +69,7 @@
 key = "#{ip}:#{time_tick}"
 num = $redis.get(key).to_i
 if num &gt; MAX_REQUEST_PER_SECOND
-  raise 'too many request'
+  raise 'too many requests'
 else
   $redis.incr(key)
   $redis.expire(key, 10)

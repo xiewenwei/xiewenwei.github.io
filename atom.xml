@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-07-07T00:18:53+08:00</updated>
+  <updated>2014-07-07T00:21:52+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -84,7 +84,7 @@
 <span class='line-number'>17</span>
 <span class='line-number'>18</span>
 </pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="c1"># 每秒最大请求数</span>
-</span><span class='line'>  <span class="no">MAX_REQUEST_PER_SECOND</span> <span class="o">=</span> <span class="mi">10</span>
+</span><span class='line'>  <span class="no">MAX_REQUESTS_PER_SECOND</span> <span class="o">=</span> <span class="mi">10</span>
 </span><span class='line'>
 </span><span class='line'>  <span class="c1"># 检查 ip 请求限制</span>
 </span><span class='line'>  <span class="c1"># @param ip</span>
@@ -95,7 +95,7 @@
 </span><span class='line'>    <span class="n">key</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">ip</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">time_tick</span><span class="si">}</span><span class="s2">&quot;</span>
 </span><span class='line'>    <span class="n">num</span> <span class="o">=</span> <span class="vg">$redis</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="o">.</span><span class="n">to_i</span>
 </span><span class='line'>    <span class="k">if</span> <span class="n">num</span> <span class="o">&gt;</span> <span class="no">MAX_REQUEST_PER_SECOND</span>
-</span><span class='line'>      <span class="k">raise</span> <span class="s1">&#39;too many request&#39;</span>
+</span><span class='line'>      <span class="k">raise</span> <span class="s1">&#39;too many requests&#39;</span>
 </span><span class='line'>    <span class="k">else</span>
 </span><span class='line'>      <span class="vg">$redis</span><span class="o">.</span><span class="n">incr</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
 </span><span class='line'>      <span class="vg">$redis</span><span class="o">.</span><span class="n">expire</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
