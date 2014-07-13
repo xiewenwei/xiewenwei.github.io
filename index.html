@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Redis 是目前 NoSQL 领域的当红炸子鸡，它象一把瑞士军刀，小巧、锋利、实用，特别适合解决一些使用传统关系数据库难以解决的问题。打算写一系列 Redis 使用模式的文章，深入总结介绍 Redis 常见的使用模式，以供大家参考。 常见汇总计数器 汇总计数是系统常见功能， &hellip;">
+  <meta name="description" content="capistrano 是使用方便，功能强大的自动化部署工具，它已经成为 Ruby 部署事实上的标准，薄荷项目自动化部署一直使用 capistrano。以前薄荷的服务器基本上是物理机，这些物理机都直接连接外网，最近租用了一些了云主机，为了更好的安全性，同时也为了节约成本， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,91 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-07-13T14:44:00+08:00" pubdate data-updated="true">2014-07-13</time>
+        
+         | <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>capistrano 是使用方便，功能强大的自动化部署工具，它已经成为 Ruby 部署事实上的标准，薄荷项目自动化部署一直使用 capistrano。以前薄荷的服务器基本上是物理机，这些物理机都直接连接外网，最近租用了一些了云主机，为了更好的安全性，同时也为了节约成本，绝大大部分云主机并没有连接外网，只能通过一台连接外网的中转机连接。我们需要把应用部署到这些内部服务器上，最初我们使用了在中转机进行端口转发的方式，最近使用 capistrano deploy via gateway（姑且把它称为网关中转）方式，十分方便。</p>
+
+<p>服务器部署示意图如下所示：</p>
+
+<p><img src="/images/house/top.png" alt="服务器部署示意图" /></p>
+
+<h2>端口转发方式</h2>
+
+<p>端口转发方式要对中转服务器端口转发做设置，在 iptables 中配置例子如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-A PREROUTING -p tcp -m tcp --dport 10222 -j DNAT --to-destination 192.168.1.102:22</span></code></pre></td></tr></table></div></figure>
+
+
+<p>端口转发实质上和 capistrano 没有直接关系，是在网络层面对中转服务器和内网实际部署服务器做了设置，让 capistrano 通过一个特定的端口与内网服务器通信，在 capistrano 看起来，内网服务器和中转服务器是一样的，只是端口不同而已。</p>
+
+<h2>网关中转方式</h2>
+
+<p>网关中转方式下，部署客户机首先和中转服务器建立连接，中间服务器再和内网服务器建立连接，部署工作站和内网服务器通过这两个连接通信。网关中转方式通过 capistrano 设置 deploy via gateway 选项完成，不需要对中转服务器做转发设置。</p>
+
+<p>需要注意的是，使用网关中转方式时，capistrano 2.x 和 capistrano 3.x 差异很大，两种并不兼容。</p>
+
+<p>capistrano 2.x 设置很简单，只要设置 gateway 选项就行了，如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="c1"># 实际使用中要把 &lt;user&gt; 和 &lt;gateway host&gt; 替换为真实值</span>
+</span><span class='line'>  <span class="n">set</span> <span class="ss">:gateway</span><span class="p">,</span> <span class="s2">&quot;&lt;user&gt;@&lt;gateway host&gt;&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>capistrano 2.x 的设置在 capistrano 3.x 下不能工作，原因是 cap3 对网络连接做了非常大得重构，原来一些特性使用接口有变化。
+capistrano 3.x 设置如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="nb">require</span> <span class="s1">&#39;net/ssh/proxy/command&#39;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># 实际使用中要把 &lt;user&gt; 和 &lt;gateway host&gt; 替换为真实值</span>
+</span><span class='line'>  <span class="n">set</span> <span class="ss">:ssh_options</span><span class="p">,</span> <span class="n">proxy</span><span class="p">:</span>
+</span><span class='line'>    <span class="no">Net</span><span class="o">::</span><span class="no">SSH</span><span class="o">::</span><span class="no">Proxy</span><span class="o">::</span><span class="no">Command</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;ssh &lt;user&gt;@&lt;gateway host&gt; -W %h:%p&#39;</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>总结：capistrano 可以通过简单的设置完成向内网服务器部署应用，有端口转发和网关中转两种方式，推荐使用网关中转方式。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1377,75 +1462,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/">一种轻量的移动应用离线操作和数据同步策略</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2013-06-03T22:58:00+08:00" pubdate data-updated="true">2013-06-03</time>
-        
-         | <a href="/blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>对移动应用而言，离线操作和数据同步是一件烦人的事情，组合使用本地数据，远程数据缓存和服务请求暂存的策略，可以使之变得比较轻松简单。</p>
-
-
-
-
-<h2>使用本地数据</h2>
-
-
-
-
-<p>为了 app 在离线状态下部分功能依然能够使用，可以把部分数据直接和应用打包在一起发布。这样当应用检测到网络不通时，可以使用本地数据。比如对于食物查询功能，在网络通的时候是请求服务器完成查询的，当网络不通时，就使用本地的数据做查询。使用本地数据有两个制约，一是本地数据不能太大，太大的话应用打包后的体积会很大；二是本地数据的功能有所限制。比如对于食物查询而言，通过请求服务器完成时可以使用比较智能的搜索，使用本地查询的化就只能使用简单的文本匹配了。所以在离线操作时，需要提示用户使用的是本地数据，功能所限，联网使用的话才能使用完整功能。</p>
-
-
-
-
-<h2>远程数据缓存</h2>
-
-
-
-
-<p>因为本地数据有很多限制，数量不全，然后内容也不全，使用远程数据缓存可以减轻本地数据的限制。比如，食物数据只包括了最基本的名称和单位热量数据，没有包括额外的介绍、评价等数据。但是用户已经查询的食物数据可以缓存起来，离线操作查询的时候也可以显示这些信息。另外，缓存数据的一大好处是能大幅提高应用的性能。毕竟大部分操作是以读为主的，数据的变化也不是很频繁，如果利用缓存的话，能够大幅减少请求次数和网络带宽。</p>
-
-
-
-
-<h2>暂存数据操作请求</h2>
-
-
-
-
-<p>对于写请求的操作，在离线的时候，可以简单的把整个请求 URL 和 参数先保存起来，等到网络通了只会，再依次按顺序发送给服务器完成操作。这种方法，对比应用和服务器之间互相跟踪数据变化记录，然后根据变化记录操作数据的方法，要简单得多，而且如果中间出现问题，故障处理也要简单可靠的多。</p>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1461,6 +1477,10 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/07/06/redis-use-pattern-1-counter/">Redis 使用模式之一：计数器</a>
       </li>
     
@@ -1474,10 +1494,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
     
       <li class="post">
         <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
       </li>
     
   </ul>

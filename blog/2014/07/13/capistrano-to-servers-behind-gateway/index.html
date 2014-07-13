@@ -1,0 +1,280 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>使用 capistrano 部署到内部服务器 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="capistrano 是使用方便，功能强大的自动化部署工具，它已经成为 Ruby 部署事实上的标准，薄荷项目自动化部署一直使用 capistrano。以前薄荷的服务器基本上是物理机，这些物理机都直接连接外网，最近租用了一些了云主机，为了更好的安全性，同时也为了节约成本， &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/07/13/capistrano-to-servers-behind-gateway/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">使用 capistrano 部署到内部服务器</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-07-13T14:44:00+08:00" pubdate data-updated="true">2014-07-13</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>capistrano 是使用方便，功能强大的自动化部署工具，它已经成为 Ruby 部署事实上的标准，薄荷项目自动化部署一直使用 capistrano。以前薄荷的服务器基本上是物理机，这些物理机都直接连接外网，最近租用了一些了云主机，为了更好的安全性，同时也为了节约成本，绝大大部分云主机并没有连接外网，只能通过一台连接外网的中转机连接。我们需要把应用部署到这些内部服务器上，最初我们使用了在中转机进行端口转发的方式，最近使用 capistrano deploy via gateway（姑且把它称为网关中转）方式，十分方便。</p>
+
+<p>服务器部署示意图如下所示：</p>
+
+<p><img src="/images/house/top.png" alt="服务器部署示意图" /></p>
+
+<h2>端口转发方式</h2>
+
+<p>端口转发方式要对中转服务器端口转发做设置，在 iptables 中配置例子如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>-A PREROUTING -p tcp -m tcp --dport 10222 -j DNAT --to-destination 192.168.1.102:22</span></code></pre></td></tr></table></div></figure>
+
+
+<p>端口转发实质上和 capistrano 没有直接关系，是在网络层面对中转服务器和内网实际部署服务器做了设置，让 capistrano 通过一个特定的端口与内网服务器通信，在 capistrano 看起来，内网服务器和中转服务器是一样的，只是端口不同而已。</p>
+
+<h2>网关中转方式</h2>
+
+<p>网关中转方式下，部署客户机首先和中转服务器建立连接，中间服务器再和内网服务器建立连接，部署工作站和内网服务器通过这两个连接通信。网关中转方式通过 capistrano 设置 deploy via gateway 选项完成，不需要对中转服务器做转发设置。</p>
+
+<p>需要注意的是，使用网关中转方式时，capistrano 2.x 和 capistrano 3.x 差异很大，两种并不兼容。</p>
+
+<p>capistrano 2.x 设置很简单，只要设置 gateway 选项就行了，如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="c1"># 实际使用中要把 &lt;user&gt; 和 &lt;gateway host&gt; 替换为真实值</span>
+</span><span class='line'>  <span class="n">set</span> <span class="ss">:gateway</span><span class="p">,</span> <span class="s2">&quot;&lt;user&gt;@&lt;gateway host&gt;&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>capistrano 2.x 的设置在 capistrano 3.x 下不能工作，原因是 cap3 对网络连接做了非常大得重构，原来一些特性使用接口有变化。
+capistrano 3.x 设置如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="nb">require</span> <span class="s1">&#39;net/ssh/proxy/command&#39;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># 实际使用中要把 &lt;user&gt; 和 &lt;gateway host&gt; 替换为真实值</span>
+</span><span class='line'>  <span class="n">set</span> <span class="ss">:ssh_options</span><span class="p">,</span> <span class="n">proxy</span><span class="p">:</span>
+</span><span class='line'>    <span class="no">Net</span><span class="o">::</span><span class="no">SSH</span><span class="o">::</span><span class="no">Proxy</span><span class="o">::</span><span class="no">Command</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;ssh &lt;user&gt;@&lt;gateway host&gt; -W %h:%p&#39;</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>总结：capistrano 可以通过简单的设置完成向内网服务器部署应用，有端口转发和网关中转两种方式，推荐使用网关中转方式。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-07-13T14:44:00+08:00" pubdate data-updated="true">2014-07-13</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/capistrano/'>capistrano</a>, <a class='category' href='/blog/categories/deploying/'>deploying</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/07/06/redis-use-pattern-1-counter/" title="Previous Post: Redis 使用模式之一：计数器">&laquo; Redis 使用模式之一：计数器</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/07/06/redis-use-pattern-1-counter/">Redis 使用模式之一：计数器</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/29/build-index-in-mongodb/">MongoDB 中建索引注意事项</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/28/2014-boohee-jobs/">【上海】薄荷科技长期寻找靠谱的 Ruby, Web 前端，iOS 和 Android 工程师</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/07/13/capistrano-to-servers-behind-gateway/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/07/13/capistrano-to-servers-behind-gateway/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

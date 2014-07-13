@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: capistrano | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/capistrano/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-07-13T15:52:10+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[使用 capistrano 部署到内部服务器]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/07/13/capistrano-to-servers-behind-gateway/"/>
+    <updated>2014-07-13T14:44:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/07/13/capistrano-to-servers-behind-gateway</id>
+    <content type="html"><![CDATA[<p>capistrano 是使用方便，功能强大的自动化部署工具，它已经成为 Ruby 部署事实上的标准，薄荷项目自动化部署一直使用 capistrano。以前薄荷的服务器基本上是物理机，这些物理机都直接连接外网，最近租用了一些了云主机，为了更好的安全性，同时也为了节约成本，绝大大部分云主机并没有连接外网，只能通过一台连接外网的中转机连接。我们需要把应用部署到这些内部服务器上，最初我们使用了在中转机进行端口转发的方式，最近使用 capistrano deploy via gateway（姑且把它称为网关中转）方式，十分方便。</p>
+
+<p>服务器部署示意图如下所示：</p>
+
+<p><img src="/images/house/top.png" alt="服务器部署示意图" /></p>
+
+<h2>端口转发方式</h2>
+
+<p>端口转发方式要对中转服务器端口转发做设置，在 iptables 中配置例子如下：
+<code>
+-A PREROUTING -p tcp -m tcp --dport 10222 -j DNAT --to-destination 192.168.1.102:22
+</code></p>
+
+<p>端口转发实质上和 capistrano 没有直接关系，是在网络层面对中转服务器和内网实际部署服务器做了设置，让 capistrano 通过一个特定的端口与内网服务器通信，在 capistrano 看起来，内网服务器和中转服务器是一样的，只是端口不同而已。</p>
+
+<h2>网关中转方式</h2>
+
+<p>网关中转方式下，部署客户机首先和中转服务器建立连接，中间服务器再和内网服务器建立连接，部署工作站和内网服务器通过这两个连接通信。网关中转方式通过 capistrano 设置 deploy via gateway 选项完成，不需要对中转服务器做转发设置。</p>
+
+<p>需要注意的是，使用网关中转方式时，capistrano 2.x 和 capistrano 3.x 差异很大，两种并不兼容。</p>
+
+<p>capistrano 2.x 设置很简单，只要设置 gateway 选项就行了，如下所示：</p>
+
+<p><code>ruby
+  # 实际使用中要把 &lt;user&gt; 和 &lt;gateway host&gt; 替换为真实值
+  set :gateway, "&lt;user&gt;@&lt;gateway host&gt;"
+</code></p>
+
+<p>capistrano 2.x 的设置在 capistrano 3.x 下不能工作，原因是 cap3 对网络连接做了非常大得重构，原来一些特性使用接口有变化。
+capistrano 3.x 设置如下：</p>
+
+<p>```ruby
+  require 'net/ssh/proxy/command'</p>
+
+<p>  # 实际使用中要把 <user> 和 <gateway host> 替换为真实值
+  set :ssh_options, proxy:</p>
+
+<pre><code>Net::SSH::Proxy::Command.new('ssh &lt;user&gt;@&lt;gateway host&gt; -W %h:%p')  
+</code></pre>
+
+<p>```</p>
+
+<p>总结：capistrano 可以通过简单的设置完成向内网服务器部署应用，有端口转发和网关中转两种方式，推荐使用网关中转方式。</p>
+]]></content>
+  </entry>
+  
+</feed>

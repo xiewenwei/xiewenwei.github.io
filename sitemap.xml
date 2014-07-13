@@ -99,6 +99,12 @@
         <lastmod>2014-07-07T00:21:29+08:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://xiewenwei.github.com//blog/2014/07/13/capistrano-to-servers-behind-gateway/
+        </loc>
+        <lastmod>2014-07-13T15:51:32+08:00</lastmod>
+    </url>
+    <url>
         <loc>http://xiewenwei.github.com//about-me/</loc>
         <lastmod>2014-06-23T21:53:52+08:00</lastmod>
     </url>
@@ -110,10 +116,10 @@
     </url>
     <url>
         <loc>http://xiewenwei.github.com//blog/archives/</loc>
-        <lastmod>2014-07-07T00:21:29+08:00</lastmod>
+        <lastmod>2014-07-13T15:51:32+08:00</lastmod>
     </url>
     <url>
         <loc>http://xiewenwei.github.com//</loc>
-        <lastmod>2014-07-07T00:21:29+08:00</lastmod>
+        <lastmod>2014-07-13T15:51:32+08:00</lastmod>
     </url>
 </urlset>

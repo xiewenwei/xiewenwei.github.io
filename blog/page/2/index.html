@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Web 应用大多是 IO 密集型的，利用 Ruby 多进程+多线程模型将能大幅提升系统吞吐量。其原因在于：当Ruby 某个线程处于 IO Block 状态时，其它的线程还可以继续执行。但由于存在 Ruby GIL (Global Interpreter Lock)，MRI Ruby &hellip;">
+  <meta name="description" content="对移动应用而言，离线操作和数据同步是一件烦人的事情，组合使用本地数据，远程数据缓存和服务请求暂存的策略，可以使之变得比较轻松简单。 使用本地数据 为了 app 在离线状态下部分功能依然能够使用，可以把部分数据直接和应用打包在一起发布。这样当应用检测到网络不通时，可以使用本地数据。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,75 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/">一种轻量的移动应用离线操作和数据同步策略</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-06-03T22:58:00+08:00" pubdate data-updated="true">2013-06-03</time>
+        
+         | <a href="/blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>对移动应用而言，离线操作和数据同步是一件烦人的事情，组合使用本地数据，远程数据缓存和服务请求暂存的策略，可以使之变得比较轻松简单。</p>
+
+
+
+
+<h2>使用本地数据</h2>
+
+
+
+
+<p>为了 app 在离线状态下部分功能依然能够使用，可以把部分数据直接和应用打包在一起发布。这样当应用检测到网络不通时，可以使用本地数据。比如对于食物查询功能，在网络通的时候是请求服务器完成查询的，当网络不通时，就使用本地的数据做查询。使用本地数据有两个制约，一是本地数据不能太大，太大的话应用打包后的体积会很大；二是本地数据的功能有所限制。比如对于食物查询而言，通过请求服务器完成时可以使用比较智能的搜索，使用本地查询的化就只能使用简单的文本匹配了。所以在离线操作时，需要提示用户使用的是本地数据，功能所限，联网使用的话才能使用完整功能。</p>
+
+
+
+
+<h2>远程数据缓存</h2>
+
+
+
+
+<p>因为本地数据有很多限制，数量不全，然后内容也不全，使用远程数据缓存可以减轻本地数据的限制。比如，食物数据只包括了最基本的名称和单位热量数据，没有包括额外的介绍、评价等数据。但是用户已经查询的食物数据可以缓存起来，离线操作查询的时候也可以显示这些信息。另外，缓存数据的一大好处是能大幅提高应用的性能。毕竟大部分操作是以读为主的，数据的变化也不是很频繁，如果利用缓存的话，能够大幅减少请求次数和网络带宽。</p>
+
+
+
+
+<h2>暂存数据操作请求</h2>
+
+
+
+
+<p>对于写请求的操作，在离线的时候，可以简单的把整个请求 URL 和 参数先保存起来，等到网络通了只会，再依次按顺序发送给服务器完成操作。这种方法，对比应用和服务器之间互相跟踪数据变化记录，然后根据变化记录操作数据的方法，要简单得多，而且如果中间出现问题，故障处理也要简单可靠的多。</p>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1948,60 +2017,6 @@ Example 4:</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/02/wo-men-xing-fu-de-yi-jia/">我们幸福的一家</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-02T17:20:00+08:00" pubdate data-updated="true">2012-07-02</time>
-        
-         | <a href="/blog/2012/07/02/wo-men-xing-fu-de-yi-jia/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>感谢上苍赐予我和爱妻一对健康可爱的儿女。</p>
-
-<p><img src="/images/photos/MG_3473_meitu_1.jpg" alt="Photo1" /></p>
-
-<p>弟弟还小，青禾姐姐要多关心弟弟哦。</p>
-
-<p><img src="/images/photos/MG_3543_meitu_3.jpg" alt="Photo2" /></p>
-
-<p>青禾骑车的姿势很酷吧。</p>
-
-<p><img src="/images/photos/MG_3553_meitu_2.jpg" alt="Photo3" /></p>
-
-<p>直树很醒目的样子。</p>
-
-<p><img src="/images/photos/MG_3645_meitu_1.jpg" alt="Photo4" /></p>
-
-<p>青禾在大声呼喊，啊～～</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -2019,6 +2034,10 @@ Example 4:</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/07/06/redis-use-pattern-1-counter/">Redis 使用模式之一：计数器</a>
       </li>
     
@@ -2032,10 +2051,6 @@ Example 4:</p>
     
       <li class="post">
         <a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a>
       </li>
     
   </ul>
