@@ -1,0 +1,302 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>实例探索 Git 对象模型 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="一个纯研究演示 Git 对象模型的项目，项目在 https://github.com/xiewenwei/dig-git，总共有 5 次 commit（包括一次 merge），都是很简单的内容，我们可以仔细观察一下每一 commit 之后 Git 对象模型图，以此分析 Git 存储的原理。 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/08/03/dig-into-git-object-model/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">实例探索 Git 对象模型</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-08-03T18:48:00+08:00" pubdate data-updated="true">2014-08-03</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>一个纯研究演示 Git 对象模型的项目，项目在  https://github.com/xiewenwei/dig-git，总共有 5 次 commit（包括一次 merge），都是很简单的内容，我们可以仔细观察一下每一 commit 之后 Git 对象模型图，以此分析 Git 存储的原理。</p>
+
+<ul>
+<li><ol>
+<li>首次提交，提交一个简单的文件 a.txt ，commit 之后的图如下：</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/9c44291362d64765803afba65fa2a0a4.png" alt="" /></p>
+
+<p>如图所示，生成了 3 个对象，一个 commit 对象，一个 tree 对象，一个 blob 对象。图上蓝底是 commit 对象，灰底的是 tree 对象，白底的是 blob 对象，每个对象节点的标题是对象的 key (SHA 摘要)缩略表示。
+对于 commit 对象，tree 内容表示这个 commit 对应根目录的 tree 对象，parent 表示父 commit 节点，通常commit 只有一个父节点，也可能没有（首次提交时 parent 为空），也可能有多个（合并节点），commit 对象还保存了 commit message 等信息。
+对于 tree 对象，里面的内容包含了文件名，文件对应的 blob 对象的 key，或者是目录名和目录对应 tree 对象的 key。
+对于 blob 对象，表示一个实际文件对象的内容，但不包括文件名，文件名是在 tree 对象里存的。</p>
+
+<p>这个图怎么得到的呢？主要是两个命令：
+* 通过 <code>git log</code> 命令获取最新 commit 的 key
+* 通过 <code>git cat-file -p &lt;object key&gt;</code>  获取 key 对应 object 的内容，根据 object 里的内容，继续探索，就可以访问到所有关联 object.</p>
+
+<ul>
+<li><ol>
+<li>第 2 次提交，修改了 a.txt 文件：</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/ba84d2ce8ba5066444a3e382ed644206.png" alt="" /></p>
+
+<p>因为 a.txt 文件已经修改，生成了一个新的 blob 对象，tree 对象和 commit 对象。如图所示，commit 对象之间是有关联的，新提交的 commit 对象的 parent 是上一次提交的 commit 对象。</p>
+
+<ul>
+<li><ol>
+<li>第 3 次提交，这次已稍微复杂一点，增加一个新文件 b.txt ，一个新目录 lib ，lib 里增加一个文件 c.txt</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/1ab7f0d2ab24734f0af6fc2d8e7c7a7d.png" alt="" /></p>
+
+<p>如图所示，目录是有一个 tree 对象表示的，里面的内容指明了目录包含的文件或子目录。</p>
+
+<ul>
+<li><ol>
+<li>第 4 次提交，这次弄出一个新的分支 test1，并且在新分支中做了一次 commit</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/8378188d524614d5b12bc27c42404a24.png" alt="" /></p>
+
+<p>0c5ca 对应的 commit 对象就是生成的分支 test1 中的。分支在 Git 中是一个非常轻量化的操作，建立分支甚至都不增加新的对象。</p>
+
+<ul>
+<li><ol>
+<li>第 5 次提交，这次涉及到一个合并操作，图已经变得比较复杂了</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/8e555b42a9775d725bd95ee7f369af7c.png" alt="" /></p>
+
+<p>def18 就是合并后的 commit 对象。合并生成了一个新的commit ，这个 commit 的 parent 有两个，指向合并的两个原分支对应的 commit 上。</p>
+
+<p>抱歉没有写得很详细，恐怕需要自己参照例子试试一看看，搞明白这些图，也就能搞明白整个 Git 对象模型机制了。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-08-03T18:48:00+08:00" pubdate data-updated="true">2014-08-03</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/git/'>Git</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/" title="Previous Post: 使用 capistrano 部署到内部服务器">&laquo; 使用 capistrano 部署到内部服务器</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/07/06/redis-use-pattern-1-counter/">Redis 使用模式之一：计数器</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/29/build-index-in-mongodb/">MongoDB 中建索引注意事项</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/06/28/2014-boohee-jobs/">【上海】薄荷科技长期寻找靠谱的 Ruby, Web 前端，iOS 和 Android 工程师</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/08/03/dig-into-git-object-model/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/08/03/dig-into-git-object-model/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

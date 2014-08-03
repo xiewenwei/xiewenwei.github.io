@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-07-13T15:52:10+08:00</updated>
+  <updated>2014-08-03T18:52:52+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -12,6 +12,84 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[实例探索 Git 对象模型]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/08/03/dig-into-git-object-model/"/>
+    <updated>2014-08-03T18:48:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/08/03/dig-into-git-object-model</id>
+    <content type="html"><![CDATA[<p>一个纯研究演示 Git 对象模型的项目，项目在  https://github.com/xiewenwei/dig-git，总共有 5 次 commit（包括一次 merge），都是很简单的内容，我们可以仔细观察一下每一 commit 之后 Git 对象模型图，以此分析 Git 存储的原理。</p>
+
+<ul>
+<li><ol>
+<li>首次提交，提交一个简单的文件 a.txt ，commit 之后的图如下：</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/9c44291362d64765803afba65fa2a0a4.png" alt="" /></p>
+
+<p>如图所示，生成了 3 个对象，一个 commit 对象，一个 tree 对象，一个 blob 对象。图上蓝底是 commit 对象，灰底的是 tree 对象，白底的是 blob 对象，每个对象节点的标题是对象的 key (SHA 摘要)缩略表示。
+对于 commit 对象，tree 内容表示这个 commit 对应根目录的 tree 对象，parent 表示父 commit 节点，通常commit 只有一个父节点，也可能没有（首次提交时 parent 为空），也可能有多个（合并节点），commit 对象还保存了 commit message 等信息。
+对于 tree 对象，里面的内容包含了文件名，文件对应的 blob 对象的 key，或者是目录名和目录对应 tree 对象的 key。
+对于 blob 对象，表示一个实际文件对象的内容，但不包括文件名，文件名是在 tree 对象里存的。</p>
+
+<p>这个图怎么得到的呢？主要是两个命令：
+* 通过 <code>git log</code> 命令获取最新 commit 的 key
+* 通过 <code>git cat-file -p &lt;object key&gt;</code>  获取 key 对应 object 的内容，根据 object 里的内容，继续探索，就可以访问到所有关联 object.</p>
+
+<ul>
+<li><ol>
+<li>第 2 次提交，修改了 a.txt 文件：</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/ba84d2ce8ba5066444a3e382ed644206.png" alt="" /></p>
+
+<p>因为 a.txt 文件已经修改，生成了一个新的 blob 对象，tree 对象和 commit 对象。如图所示，commit 对象之间是有关联的，新提交的 commit 对象的 parent 是上一次提交的 commit 对象。</p>
+
+<ul>
+<li><ol>
+<li>第 3 次提交，这次已稍微复杂一点，增加一个新文件 b.txt ，一个新目录 lib ，lib 里增加一个文件 c.txt</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/1ab7f0d2ab24734f0af6fc2d8e7c7a7d.png" alt="" /></p>
+
+<p>如图所示，目录是有一个 tree 对象表示的，里面的内容指明了目录包含的文件或子目录。</p>
+
+<ul>
+<li><ol>
+<li>第 4 次提交，这次弄出一个新的分支 test1，并且在新分支中做了一次 commit</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/8378188d524614d5b12bc27c42404a24.png" alt="" /></p>
+
+<p>0c5ca 对应的 commit 对象就是生成的分支 test1 中的。分支在 Git 中是一个非常轻量化的操作，建立分支甚至都不增加新的对象。</p>
+
+<ul>
+<li><ol>
+<li>第 5 次提交，这次涉及到一个合并操作，图已经变得比较复杂了</li>
+</ol>
+</li>
+</ul>
+
+
+<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/8e555b42a9775d725bd95ee7f369af7c.png" alt="" /></p>
+
+<p>def18 就是合并后的 commit 对象。合并生成了一个新的commit ，这个 commit 的 parent 有两个，指向合并的两个原分支对应的 commit 上。</p>
+
+<p>抱歉没有写得很详细，恐怕需要自己参照例子试试一看看，搞明白这些图，也就能搞明白整个 Git 对象模型机制了。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用 capistrano 部署到内部服务器]]></title>
@@ -2539,238 +2617,6 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
 <p>最后是一个小演讲，王松林介绍他们在嵌入设备上使用 cruby 和 mruby 的一些经验。</p>
 
 <p>RubyConfChina 大会已经举办了 4 届，这 4 届我都有参加，感觉这一届是过往最热闹，最精彩的一届，可以明显感觉到 Ruby 在中国稳步前行，让我为自己作为一名 Ruby 程序员而自豪。感谢辛勤大会组织者，感谢杰出的演讲者，感谢所有为大会贡献的公司和个人，相信 Ruby 的世界会更美好，中国的 Ruby 更美好。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Ruby: block proc and lambda]]></title>
-    <link href="http://xiewenwei.github.com//blog/2012/11/12/ruby-block-proc-and-lambda/"/>
-    <updated>2012-11-12T14:12:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2012/11/12/ruby-block-proc-and-lambda</id>
-    <content type="html"><![CDATA[<p>在规则引擎中，Ruby 的闭包使用特别频繁，而且有 block，Proc和 lambda 等后几种形式的用法，很让人困惑。为了深入理解代码，再次认真学习了一下 Ruby 的闭包，特别是 block，proc 和 lambda 几种用法的异同，这次的周记就和大家分享一下心得。</p>
-
-<p>闭包是 Ruby 相对其它语言特别优势之一，很多语言有闭包，但是唯有 Ruby 把闭包的优势发挥得淋漓尽致。Ruby 的哲学之一：同一个问题现实中有多种解决方法，所以 Ruby 中也有多种解法，所以闭包的使用也有多种方法。</p>
-
-<p>先看一个代码的例子：
-Example 1:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">def</span> <span class="nf">foo1</span>
-</span><span class='line'>  <span class="k">yield</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">def</span> <span class="nf">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">b</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="n">b</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo1 in block&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">foo2</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo2 in block&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
-</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
-</span><span class='line'><span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
-</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>输出：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='sh'><span class='line'>》foo1 in block
-</span><span class='line'>》foo2 in block
-</span><span class='line'>》foo in proc
-</span><span class='line'>》foo in proc
-</span><span class='line'>》foo in lambda
-</span><span class='line'>》foo in lambda
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>大家是不是有些困惑，首先是方法 foo1 和 foo2 都能接收闭包，它们这两种写法有什么区别，然后是作为参数的三种闭包 block，proc和 lambda有什么区别。</p>
-
-<h2>1. yield 和 block call 的区别</h2>
-
-<p>yield 和 block call 两种都能实现运行闭包，从实际运行效果来说，区别不大。其区别主要在于：</p>
-
-<h3>1.1 闭包的传递和保存</h3>
-
-<p>因为闭包已经传递到参数里，所以可以继续传递或保存起来，例如：</p>
-
-<p>Exampl 2:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">class</span> <span class="nc">A</span>
-</span><span class='line'>      <span class="k">def</span> <span class="nf">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
-</span><span class='line'>         <span class="vi">@proc</span> <span class="o">=</span> <span class="n">b</span>
-</span><span class='line'>      <span class="k">end</span>
-</span><span class='line'>      <span class="k">def</span> <span class="nf">foo2</span>
-</span><span class='line'>          <span class="vi">@proc</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="vi">@proc</span>
-</span><span class='line'>      <span class="k">end</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="n">a</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;proc from foo1&quot;</span> <span class="p">}</span>
-</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo2</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<h3>1.2 性能</h3>
-
-<p>yield不是方法调用，而是 Ruby 的关键字，yield 要比 block call 比快 1 倍左右。</p>
-
-<h2>2. block 和 proc, lambda 的区别</h2>
-
-<p>很简单直接，引入 proc 和 lambda 就是为了复用，避免重复定义，例如在 example 1 中，使用 proc 变量存储闭包，避免重复定义两个 block 。</p>
-
-<h2>3. proc 和 lambda 的区别</h2>
-
-<p>这大概是最让人困惑的地方，从 Example 1 的行为上看，他们的效果是一致的，为什么要用两种不同的表达方式。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>确实，对于简单的情况，比如 Example 1的情况，他们的行为是一致的，但是主要在两个地方有明显差异：</p>
-
-<h3>1.1 参数检查</h3>
-
-<p>还是例子说话
-Example 3:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
-</span><span class='line'>      <span class="n">x</span> <span class="o">=</span> <span class="mi">100</span>
-</span><span class='line'>      <span class="k">yield</span> <span class="n">x</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'>   <span class="n">lambda_proc1</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc1</span><span class="p">)</span>
-</span><span class='line'>   <span class="n">lambda_proc2</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc2</span><span class="p">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>输出</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》a is 100 b is nil
-</span><span class='line'>   》a is 100
-</span><span class='line'>   》ArgumentError: wrong number of arguments <span class="o">(</span>1 <span class="k">for </span>2<span class="o">)</span>
-</span><span class='line'>      …
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>    <br/>
-可见，proc 不会对参数进行个数匹配检查，而 lambda 会，如果不匹配还会报异常，所以安全起见，建议优先用 lambda。</p>
-
-<h3>1.2 返回上层</h3>
-
-<p>还是例子说话
-Example 4:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
-</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from foo from inside proc&quot;</span> <span class="p">}</span>
-</span><span class='line'>     <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control leaves foo here</span>
-</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from foo&quot;</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'>   <span class="k">def</span> <span class="nf">bar</span>
-</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from lambda&quot;</span> <span class="p">}</span>
-</span><span class='line'>     <span class="nb">puts</span> <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control does not leave bar here</span>
-</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from bar&quot;</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'>   <span class="nb">puts</span> <span class="n">foo</span>
-</span><span class='line'>   <span class="nb">puts</span> <span class="n">bar</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>   输出</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》return from foo from inside proc
-</span><span class='line'>   》return from lambda
-</span><span class='line'>   》return from bar
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p> <br/>
-可见，proc 中，return 相当于执行了闭包环境里的 return，而 lambda 只是返回call 闭包所在环境。</p>
-
-<p><em>总结：闭包是 Ruby 的强大特性，它的几种表达方式block，proc 和 lambda有细微差别，要用好它需要对其深入理解。</em></p>
 ]]></content>
   </entry>
   
