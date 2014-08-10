@@ -4,7 +4,7 @@
   <title><![CDATA[Category: git | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/git/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-08-11T00:34:13+08:00</updated>
+  <updated>2014-08-11T00:37:20+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -26,37 +26,21 @@
 我们可以看到 <code>.git/refs/heads</code> 下有一些文件，每一个文件表示一个分支，文件的名称就是分支的名称，文件的内容就是 commit 对象的 key。</p>
 
 <p>例如，dig-git 项目里：
-&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</p>
-
-<h1>```</h1>
-
-<p>```shell</p>
-
-<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>7cc852c0fe06f70c54d4273471f92266b742e6b4
+<code>
 cat .git/refs/heads/master
 058ca0a55e60eae77dac9818f915dad581b5465b
 cat .git/refs/heads/test1
 0c5ca6c9e46a1e6cfe04eaea7cd5db3223ba6693
-```</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>
+</code></p>
 
 <p>是不是很简单，知道了这个原理，我们甚至可以绕开 Git 命令，直接通过文件操作生成一个 branch。
 例如：
-&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
 <code>
 echo "3c31e0a28cfc7f022984d6f8250a1c5c0670f120" &gt;&gt; .git/refs/heads/test2
 </code>
 通过上面的命令，在 <code>.git/refs/heads</code> 目录下生成一个 test2 文件，文件内容是一个 commit 对象的 key，这样就生成了一个 test2 分支。</p>
 
-<h1>标签 tag 和分支 branch 的本质是一样的，都是一个指向 commit 对象的引用，只不过标签 tag 的文件放在 <code>.git/refs/tags</code> 目录下而已。</h1>
-
-<p><code>shell
-echo "3c31e0a28cfc7f022984d6f8250a1c5c0670f120" &gt;&gt; ".git/refs/heads/test2"
-</code>
-通过上面的命令，在 .git/refs/heads 目录下生成一个 test2 文件，文件内容是一个 commit 对象的 key，这样就生成了一个 test2 分支。</p>
-
-<p>标签 tag 和分支 branch 的本质是一样的，都是一个指向 commit 对象的引用，只不过标签 tag 的文件放在 .git/refs/tags 目录下而已。</p>
-
-<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>7cc852c0fe06f70c54d4273471f92266b742e6b4</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>
+<p>标签 tag 和分支 branch 的本质是一样的，都是一个指向 commit 对象的引用，只不过标签 tag 的文件放在 <code>.git/refs/tags</code> 目录下而已。</p>
 ]]></content>
   </entry>
   
