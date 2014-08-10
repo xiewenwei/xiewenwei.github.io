@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-08-11T00:31:37+08:00</updated>
+  <updated>2014-08-11T00:34:13+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -25,28 +25,51 @@
 <p>分支的数据保存在那里呢？都在目录 <code>.git/refs</code> 中，通常这个目录下有三个子目录，分别是 heads，tags 和 remotes。
 我们可以看到 <code>.git/refs/heads</code> 下有一些文件，每一个文件表示一个分支，文件的名称就是分支的名称，文件的内容就是 commit 对象的 key。</p>
 
-<p>例如，dig-git 项目里：</p>
+<p>例如，dig-git 项目里：
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>=======</span></code></pre></td></tr></table></div></figure>
+
+
+<p>shell</p>
+
+<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>7cc852c0fe06f70c54d4273471f92266b742e6b4
+cat .git/refs/heads/master
+058ca0a55e60eae77dac9818f915dad581b5465b
+cat .git/refs/heads/test1
+0c5ca6c9e46a1e6cfe04eaea7cd5db3223ba6693</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 <span class='line-number'>3</span>
 <span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cat .git/refs/heads/master
-</span><span class='line'>058ca0a55e60eae77dac9818f915dad581b5465b
-</span><span class='line'>cat .git/refs/heads/test1
-</span><span class='line'>0c5ca6c9e46a1e6cfe04eaea7cd5db3223ba6693</span></code></pre></td></tr></table></div></figure>
+</pre></td><td class='code'><pre><code class=''><span class='line'>
+</span><span class='line'>是不是很简单，知道了这个原理，我们甚至可以绕开 Git 命令，直接通过文件操作生成一个 branch。
+</span><span class='line'>例如：
+</span><span class='line'>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</span></code></pre></td></tr></table></div></figure>
 
 
-<p>是不是很简单，知道了这个原理，我们甚至可以绕开 Git 命令，直接通过文件操作生成一个 branch。
-例如：</p>
+<p>echo &#8220;3c31e0a28cfc7f022984d6f8250a1c5c0670f120&#8221; >> .git/refs/heads/test2</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>echo "3c31e0a28cfc7f022984d6f8250a1c5c0670f120" &gt;&gt; ".git/refs/heads/test2"</span></code></pre></td></tr></table></div></figure>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>通过上面的命令，在 `.git/refs/heads` 目录下生成一个 test2 文件，文件内容是一个 commit 对象的 key，这样就生成了一个 test2 分支。
+</span><span class='line'>
+</span><span class='line'>标签 tag 和分支 branch 的本质是一样的，都是一个指向 commit 对象的引用，只不过标签 tag 的文件放在 `.git/refs/tags` 目录下而已。
+</span><span class='line'>=======</span></code></pre></td></tr></table></div></figure>
 
 
-<p>通过上面的命令，在 .git/refs/heads 目录下生成一个 test2 文件，文件内容是一个 commit 对象的 key，这样就生成了一个 test2 分支。</p>
+<p>shell
+echo &#8220;3c31e0a28cfc7f022984d6f8250a1c5c0670f120&#8221; >> &#8220;.git/refs/heads/test2&#8221;
+&#8220;`
+通过上面的命令，在 .git/refs/heads 目录下生成一个 test2 文件，文件内容是一个 commit 对象的 key，这样就生成了一个 test2 分支。</p>
 
 <p>标签 tag 和分支 branch 的本质是一样的，都是一个指向 commit 对象的引用，只不过标签 tag 的文件放在 .git/refs/tags 目录下而已。</p>
+
+<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>7cc852c0fe06f70c54d4273471f92266b742e6b4</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>
 ]]></content>
   </entry>
   
