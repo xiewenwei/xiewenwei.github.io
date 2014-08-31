@@ -5,11 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>MongoDB 中建索引注意事项 - 程序人生</title>
+  <title>避免误用 Redis - 程序人生</title>
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="上周在 ruby-china 上发了帖子《MongoDB 那些坑》，反映相当热烈，许多回复很有见地，其中一位童鞋深入的提到 MongoDB 建索引方法的问题，引发我更深入的了解了 MongoDB 建索引的方法和一些注意事项。 在 《MongoDB 那些坑》中提到，在前台直接运行建立索引命令的话， &hellip;">
+  <meta name="description" content="Redis 是目前 NoSQL 领域的当红炸子鸡，它象一把瑞士军刀，小巧、锋利、实用，特别适合解决一些使用传统关系数据库难以解决的问题。但是 Redis 不是银弹，有很多适合它解决的问题，但是也有很多并不适合它解决的问题。另外，Redis 作为内存数据库，如果用在不适合的场合， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/06/29/build-index-in-mongodb/">
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/08/31/avoid-misusing-redis/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
@@ -71,7 +71,7 @@
   
   <header>
     
-      <h1 class="entry-title">MongoDB 中建索引注意事项</h1>
+      <h1 class="entry-title">避免误用 Redis</h1>
     
     
       <p class="meta">
@@ -87,7 +87,7 @@
   
 
 
-<time datetime="2014-06-29T23:42:00+08:00" pubdate data-updated="true">2014-06-29</time>
+<time datetime="2014-08-31T23:29:00+08:00" pubdate data-updated="true">2014-08-31</time>
         
          | <a href="#disqus_thread">Comments</a>
         
@@ -96,24 +96,21 @@
   </header>
 
 
-<div class="entry-content"><p>上周在 ruby-china 上发了帖子《MongoDB 那些坑》，反映相当热烈，许多回复很有见地，其中一位童鞋深入的提到 MongoDB 建索引方法的问题，引发我更深入的了解了 MongoDB 建索引的方法和一些注意事项。</p>
+<div class="entry-content"><p>Redis 是目前 NoSQL 领域的当红炸子鸡，它象一把瑞士军刀，小巧、锋利、实用，特别适合解决一些使用传统关系数据库难以解决的问题。但是 Redis 不是银弹，有很多适合它解决的问题，但是也有很多并不适合它解决的问题。另外，Redis 作为内存数据库，如果用在不适合的场合，对内存的消耗是很可观的，甚至会让系统难以承受。</p>
 
-<p>在 《MongoDB 那些坑》中提到，在前台直接运行建立索引命令的话，将造成整个数据库阻塞，因此索引建议使用 background 的方式建立。但是这也会带来一定的问题，在 2.6 版本之前，在 secondary server 中即使使用 background 方式建立索引，secondary 还是会以 foreground 方式建立索引，它导致 secondary 同样引发数据库阻塞问题。2.6 版本修复了这个 Bug，2.6 版之后使用 background 方式建立索引时，真正转向后台运行了。</p>
+<p>我们可以对系统存储使用的数据以两种角度分类，一种是按数据的大小划分，分成大数据和小数据，另一种是按数据的冷热程度划分，分成冷数据和热数据，热数据是指读或写比较频繁的数据，反之则是冷数据。</p>
 
-<p>为了尽量降低建立索引对 MongoDB Server 的影响，有一种方法是把 MongoDB Server 转换成 standalone 模式后建立。具体做法如下：</p>
+<p>可以举一些具体的例子来说明数据的大小和冷热属性。比如网站总的注册用户数，这明显是一个小而热的数据，小是因为这个数据只有一个值，热是因为注册用户数随时间变化很频繁。再比如，用户最新访问时间数据，这是一个量比较大，冷热不均的数据，大是数据的粒度是用户级别，每一个用户都有数据，如果有一千万用户，就意味着有一千万的数据，冷热不均是因为活跃用户的最新访问时间变化很频繁，但是可能有很大一部非活跃用户访问时间长时间不会发生变化。</p>
 
-<ol>
-<li><p>首先把 secondary server 停止，在取消 <code>--replSet</code> 参数，并且更改 MongoDB port 之后重新启动 MongoDB，这时候 MongoDB 将进入 standalone 模式；</p></li>
-<li><p>在 standalone 模式下运行命令 ensureIndex 建立索引，建议使用 foreground 方式运行；</p></li>
-<li><p>建立索引完毕之后关闭 secondary server 按正常方式启动;</p></li>
-<li><p>根据上述 1~3 的步骤轮流为 secondary 建立索引，最后把 primary server 临时转换为 secondary server，同样按 1~3 的方法建立索引，再把其转换为 primary server。</p></li>
-</ol>
+<p>大体而言，Redis 最适合处理的是小而热，而且是写频繁，或者读写都比较频繁的热数据。对于大而热的数据，如果其它方式很难解决问题，也可以考虑使用 Redis 解决，但是一定要非常谨慎，防止数据无限膨胀。原因如下：</p>
 
+<p>首先，对于冷数据，无论大小，都不建议放在 Redis 中。Redis 数据要全部放在内存中，资源宝贵，把冷数据放在其中实在是一种浪费，冷数据放在普通的存储比如关系数据库中就好了。</p>
 
-<p> 这种方式还是比较麻烦的，但可以把建立索引操作对 MongoDB 的影响降到最低，在有些情况下还是值得做的。</p>
+<p>其次，对于热数据，尤其是写频繁的热数据，如果量比较小，是最适合放到 Redis 中的。比如上面提到的网站总的注册用户数，就是典型的 Redis 用做计数器的例子。再比如论坛最新发表列表，最新报名列表，可以控制数量在几百到一千的规模，也是典型的 redis 做最新列表的使用方式。</p>
 
-<p> 参考资料：
- <a href="http://docs.mongodb.org/manual/tutorial/build-indexes-on-replica-sets/">build-indexes-on-replica-sets</a></p>
+<p>另外，对于量比较大的热数据（或者冷热不均数据），使用 Redis 时一定要比较谨慎。这种类型数据很容易引起数据膨胀，导致 Redis 消耗内存巨大，让系统难以承受。薄荷的一个惨痛教训是把用户关注（以及被关注）数据放在 Redis 中，这是一种数据量极大，冷热很不均衡的数据，在几百万的用户级别就占用了近 10 GB左右内存，让 Redis 变得难以应付。应对这种类型的数据，可以用普通存储 + 缓存的方式。</p>
+
+<p>如果用对了地方，比如在小而热的数据情形，Redis 表现很棒，如果用错了地方，Redis 也会带来昂贵的代价，所以使用时务必谨慎。</p>
 </div>
 
 
@@ -136,12 +133,12 @@
   
 
 
-<time datetime="2014-06-29T23:42:00+08:00" pubdate data-updated="true">2014-06-29</time>
+<time datetime="2014-08-31T23:29:00+08:00" pubdate data-updated="true">2014-08-31</time>
       
 
 <span class="categories">
   
-    <a class='category' href='/blog/categories/mongodb/'>mongodb</a>
+    <a class='category' href='/blog/categories/redis/'>redis</a>
   
 </span>
 
@@ -157,10 +154,8 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/2014/06/28/2014-boohee-jobs/" title="Previous Post: 【上海】薄荷科技长期寻找靠谱的 Ruby, Web 前端，iOS 和 Android 工程师">&laquo; 【上海】薄荷科技长期寻找靠谱的 Ruby, Web 前端，iOS 和 Android 工程师</a>
+        <a class="basic-alignment left" href="/blog/2014/08/10/dig-into-git-branch-and-tag/" title="Previous Post: 实例探索 Git 的分支 branch 和标签 tag">&laquo; 实例探索 Git 的分支 branch 和标签 tag</a>
       
-      
-        <a class="basic-alignment right" href="/blog/2014/07/06/redis-use-pattern-1-counter/" title="Next Post: Redis 使用模式之一：计数器">Redis 使用模式之一：计数器 &raquo;</a>
       
     </p>
   </footer>
@@ -227,8 +222,8 @@
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/06/29/build-index-in-mongodb/';
-        var disqus_url = 'http://xiewenwei.github.com//blog/2014/06/29/build-index-in-mongodb/';
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/08/31/avoid-misusing-redis/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/08/31/avoid-misusing-redis/';
         var disqus_script = 'embed.js';
       
     (function () {

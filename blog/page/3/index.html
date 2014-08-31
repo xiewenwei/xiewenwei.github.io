@@ -9,8 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="昨天参加了 RubyConfChina2012 大会，听了好几个非常精彩的主题演讲，收获良多。 第一个主题演讲是 Ruby 之父 Matz 先生的演讲《Be a lanuage designer》。Matz 的演讲主要有三个部分：
-一是如何成为语言的设计师，设计语言没有大家想象中的那么困难， &hellip;">
+  <meta name="description" content="Ruby 是一种表达能力很强的语言，这得意于它异常丰富的运算符和语法糖，虽然 Ruby 一直把最小惊讶原则作为它的哲学之一，但还是常常看到让人惊讶不已，难于理解的代码，这可能是因为对它运算符和语句优先级理解不透导致，今天就和大家聊一聊 Ruby 运算符和语句的优先级。 先看一句简单的代码， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -69,6 +68,197 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/">Ruby的运算符和语句优先级</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-25T22:03:00+08:00" pubdate data-updated="true">2012-11-25</time>
+        
+         | <a href="/blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Ruby 是一种表达能力很强的语言，这得意于它异常丰富的运算符和语法糖，虽然 Ruby 一直把最小惊讶原则作为它的哲学之一，但还是常常看到让人惊讶不已，难于理解的代码，这可能是因为对它运算符和语句优先级理解不透导致，今天就和大家聊一聊 Ruby 运算符和语句的优先级。</p>
+
+<p>先看一句简单的代码，猜一猜它的输出是什么。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="nb">puts</span> <span class="p">{}</span><span class="o">.</span><span class="n">class</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>很多人一定以为结果是 Hash，但实事上结果是空，不信可以在 irb 里试一试。</p>
+
+<p>再看一段代码。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 &amp;&amp; 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 and 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="n">a</span> <span class="o">=</span> <span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span>
+</span><span class='line'><span class="n">b</span> <span class="o">=</span> <span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span>
+</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;b is </span><span class="si">#{</span><span class="n">b</span><span class="si">}</span><span class="s2">&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>结果是：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
+</span><span class='line'><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
+</span><span class='line'><span class="n">a</span> <span class="n">is</span> <span class="mi">3</span>
+</span><span class='line'><span class="n">b</span> <span class="n">is</span> <span class="mi">5</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>有没有觉得奇怪 b 怎么是 5 而不是 3 呢。</p>
+
+<p>如果这两个例子你也觉得奇怪，那说明你对 Ruby 一些运算符和语句的优先级理解还不透彻，判断有误。
+<code>puts {}.class</code> 实际上相当于 <code>(puts {}).class</code> -> <code>nil.class</code> 所以输出为空。<code>{}</code>相当于一个空的 block，优先和方法 puts 结合。
+<code>&amp;&amp; 和 and</code> 的优先是不同的，而且和 <code>=</code> 号的优先级顺序比较， <code>&amp;&amp; &gt; = &gt; and</code>，所以 <code>a = 5 &amp;&amp; 3</code> 相当于 <code>a = ( 5 &amp;&amp; 3)</code>，而 <code>b = 5 and 3</code> 相当于 <code>( b = 5 ) and 3</code>，所以结果 a 和 b的值是不同的。</p>
+
+<p>下面一张表格是 Ruby 中常见的运算符和语句的优先级列表，从上到下优先级递减。</p>
+
+<table border="1" cellspacing="0">
+<tr style="background:#efefef;">
+  <caption>Ruby operators (highest to lowest precedence)</caption>
+  <tr style="background:#efefef;">
+    <th>Method</th>
+    <th>Operator</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>Yes</td>
+    <td><code>[ ]</code> <code>[ ]=</code></td>
+    <td>Element reference, element set</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>**</code></td>
+    <td>Exponentiation (raise to the power)</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>!</code> <code>~</code> <code>+</code> <code>-</code></td>
+    <td>Not, complement, unary plus and minus (method names for the last two are <code>+@</code> and <code>-@</code>)</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>*</code> <code>/</code> <code>%</code></td>
+    <td>Multiply, divide, and modulo</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>+</code> <code>-</code></td>
+    <td>Addition and subtraction</td>
+  </tr><tr>
+
+    <td>Yes</td>
+    <td><code>&gt;&gt;</code> <code>&lt;&lt;</code></td>
+    <td>Right and left bitwise shift</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>&amp;</code></td>
+    <td>Bitwise `AND&#8217;</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>^</code> <code>|</code></td>
+    <td>Bitwise exclusive `OR&#8217; and regular `OR&#8217;</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>&lt;=</code> <code>&lt;</code> <code>&gt;</code> <code>&gt;=</code></td>
+    <td>Comparison operators</td>
+  </tr><tr>
+    <td>Yes</td>
+    <td><code>&lt;=&gt;</code> <code>==</code> <code>===</code> <code>!=</code> <code>=~</code> <code>!~</code></td>
+    <td>Equality and pattern match operators (<code>!=</code> and <code>!~</code> may not be defined as methods)</td>
+  </tr><tr>
+    <td></td>
+    <td><code>&amp;&amp;</code></td>
+    <td>Logical `AND&#8217;</td>
+  </tr><tr>
+    <td></td>
+    <td><code>||</code></td>
+    <td>Logical `AND&#8217;</td>
+  </tr><tr>
+    <td></td>
+    <td><code>..</code> <code>...</code></td>
+    <td>Range (inclusive and exclusive)</td>
+  </tr><tr>
+    <td></td>
+    <td><code>?&nbsp;:</code></td>
+    <td>Ternary if-then-else</td>
+  </tr><tr>
+    <td></td>
+    <td><code>=</code> <code>%=</code> <code></code>{ <code>/=</code> <code>-=</code> <code>+=</code> <code>|=</code> <code>&amp;=</code> <code>&gt;&gt;=</code> <code>&lt;&lt;=</code> <code>*=</code> <code>&amp;&amp;=</code> <code>||=</code> <code>**=</code></td>
+    <td>Assignment</td>
+  </tr><tr>
+    <td></td>
+    <td><code>defined?</code></td>
+    <td>Check if specified symbol defined</td>
+  </tr><tr>
+    <td></td>
+    <td><code>not</code></td>
+    <td>Logical negation</td>
+  </tr><tr>
+    <td></td>
+    <td><code>or</code> <code>and</code></td>
+    <td>Logical composition</td>
+  </tr><tr>
+    <td></td>
+    <td><code>if</code> <code>unless</code> <code>while</code> <code>until</code></td>
+    <td>Expression modifiers</td>
+  </tr><tr>
+
+    <td></td>
+    <td><code>begin/end</code></td>
+    <td>Block expression</td>
+  </tr>
+</table>
+
+
+<br/>
+
+
+<p>几条便于记忆的原则：</p>
+
+<ol>
+<li>关键字类如if and 等的优先级是要比符号类低；</li>
+<li>赋值符号 <code>= ||=</code> 等优先级也比较低，仅次于关键字类；</li>
+<li><code>[] []=</code> 元素引用的优先级非常高。</li>
+</ol>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -651,6 +841,10 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
       </li>
     
@@ -664,10 +858,6 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
     
       <li class="post">
         <a href="/blog/2014/07/06/redis-use-pattern-1-counter/">Redis 使用模式之一：计数器</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/29/build-index-in-mongodb/">MongoDB 中建索引注意事项</a>
       </li>
     
   </ul>

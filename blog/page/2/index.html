@@ -9,8 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Ruby on Rails 4.0 的 rc 版本已经 release 了，Rails 4 时代最大的变化当属默认开启多线程模式。Rails 4 的多线程将给大家带来什么好处呢？至少有两方面： 更高的系统吞吐量
-Web 站点多是 IO 密集型的，多线程可以让 Application 在等待 IO &hellip;">
+  <meta name="description" content="去年有一次的周记分享过 ActiveSupport::Concern （以下简称 Concern） 的用法，但是对它的实现原理一直不太明白，周末把它的实现源码仔细研究了一番，总算比较深入了解了它的工作原理，同时也让我对 Ruby 元编程有了更深的了解。 Concern 主要用于解决 module &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -69,6 +68,265 @@ Web 站点多是 IO 密集型的，多线程可以让 Application 在等待 IO &
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/01/13/how-activesupport-corncern-work/">ActiveSupport::Concern 的工作原理</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-01-13T00:29:00+08:00" pubdate data-updated="true">2014-01-13</time>
+        
+         | <a href="/blog/2014/01/13/how-activesupport-corncern-work/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>去年有一次的周记分享过 ActiveSupport::Concern （以下简称 Concern） 的用法，但是对它的实现原理一直不太明白，周末把它的实现源码仔细研究了一番，总算比较深入了解了它的工作原理，同时也让我对 Ruby 元编程有了更深的了解。</p>
+
+<p>Concern 主要用于解决 module mix 的依赖问题，同时简化 module mix 的步骤。
+关于依赖问题，必须用一个例子才好说明：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">Foo</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">included</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">class_eval</span> <span class="k">do</span>
+</span><span class='line'>      <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">method_injected_by_foo</span>
+</span><span class='line'>        <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">module</span> <span class="nn">Bar</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Foo</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">included</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">method_injected_by_foo</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">Host</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Foo</span> <span class="c1"># We need to include this dependency for Bar</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Bar</span> <span class="c1"># Bar is the module that Host really needs</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>上面例子中 Host 为了 include Bar，必须得先 include Bar 依赖的 Foo，这是因为 Bar 在 include Foo 时，只是为 Bar extend method_injected_by_foo 方法，所以 Host 必须显式的 include Foo，才能够 extend method_injected_by_foo 方法。</p>
+
+<p>使用 Concern 后，代码可以简写为</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;active_support/concern&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">module</span> <span class="nn">Foo</span>
+</span><span class='line'>  <span class="kp">extend</span> <span class="no">ActiveSupport</span><span class="o">::</span><span class="no">Concern</span>
+</span><span class='line'>  <span class="n">included</span> <span class="k">do</span>
+</span><span class='line'>    <span class="nb">class_eval</span> <span class="k">do</span>
+</span><span class='line'>      <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">method_injected_by_foo</span>
+</span><span class='line'>        <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">module</span> <span class="nn">Bar</span>
+</span><span class='line'>  <span class="kp">extend</span> <span class="no">ActiveSupport</span><span class="o">::</span><span class="no">Concern</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Foo</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">included</span> <span class="k">do</span>
+</span><span class='line'>    <span class="nb">self</span><span class="o">.</span><span class="n">method_injected_by_foo</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">Host</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Bar</span> <span class="c1"># works, Bar takes care now of its dependencies</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p></p>
+
+<p>Bar 和 Foo 都 <code>extend ActiveSupport::Concern</code> 后，Host include Bar 已经不需要事先 mix Foo。</p>
+
+<p>这是怎么做到的呢，看看 Concern 的代码，其实代码很少：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span>
+</span><span class='line'>  <span class="nn">module</span> <span class="no">Concern</span>
+</span><span class='line'>    <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">extended</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+</span><span class='line'>      <span class="n">base</span><span class="o">.</span><span class="n">instance_variable_set</span><span class="p">(</span><span class="s2">&quot;@_dependencies&quot;</span><span class="p">,</span> <span class="o">[]</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">append_features</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+</span><span class='line'>      <span class="k">if</span> <span class="n">base</span><span class="o">.</span><span class="n">instance_variable_defined?</span><span class="p">(</span><span class="s2">&quot;@_dependencies&quot;</span><span class="p">)</span>
+</span><span class='line'>        <span class="n">base</span><span class="o">.</span><span class="n">instance_variable_get</span><span class="p">(</span><span class="s2">&quot;@_dependencies&quot;</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="nb">self</span>
+</span><span class='line'>        <span class="k">return</span> <span class="kp">false</span>
+</span><span class='line'>      <span class="k">else</span>
+</span><span class='line'>        <span class="k">return</span> <span class="kp">false</span> <span class="k">if</span> <span class="n">base</span> <span class="o">&lt;</span> <span class="nb">self</span>
+</span><span class='line'>        <span class="vi">@_dependencies</span><span class="o">.</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">dep</span><span class="o">|</span> <span class="n">base</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="ss">:include</span><span class="p">,</span> <span class="n">dep</span><span class="p">)</span> <span class="p">}</span>
+</span><span class='line'>        <span class="k">super</span>
+</span><span class='line'>        <span class="n">base</span><span class="o">.</span><span class="n">extend</span> <span class="nb">const_get</span><span class="p">(</span><span class="s2">&quot;ClassMethods&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">const_defined?</span><span class="p">(</span><span class="s2">&quot;ClassMethods&quot;</span><span class="p">)</span>
+</span><span class='line'>        <span class="k">if</span> <span class="nb">const_defined?</span><span class="p">(</span><span class="s2">&quot;InstanceMethods&quot;</span><span class="p">)</span>
+</span><span class='line'>          <span class="n">base</span><span class="o">.</span><span class="n">send</span> <span class="ss">:include</span><span class="p">,</span> <span class="nb">const_get</span><span class="p">(</span><span class="s2">&quot;InstanceMethods&quot;</span><span class="p">)</span>
+</span><span class='line'>          <span class="no">ActiveSupport</span><span class="o">::</span><span class="no">Deprecation</span><span class="o">.</span><span class="n">warn</span> <span class="s2">&quot;The InstanceMethods module inside ActiveSupport::Concern will be &quot;</span> <span class="p">\</span>
+</span><span class='line'>            <span class="s2">&quot;no longer included automatically. Please define instance methods directly in </span><span class="si">#{</span><span class="nb">self</span><span class="si">}</span><span class="s2"> instead.&quot;</span><span class="p">,</span> <span class="nb">caller</span>
+</span><span class='line'>        <span class="k">end</span>
+</span><span class='line'>        <span class="n">base</span><span class="o">.</span><span class="n">class_eval</span><span class="p">(</span><span class="o">&amp;</span><span class="vi">@_included_block</span><span class="p">)</span> <span class="k">if</span> <span class="n">instance_variable_defined?</span><span class="p">(</span><span class="s2">&quot;@_included_block&quot;</span><span class="p">)</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">included</span><span class="p">(</span><span class="n">base</span> <span class="o">=</span> <span class="kp">nil</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">block</span><span class="p">)</span>
+</span><span class='line'>      <span class="k">if</span> <span class="n">base</span><span class="o">.</span><span class="n">nil?</span>
+</span><span class='line'>        <span class="vi">@_included_block</span> <span class="o">=</span> <span class="n">block</span>
+</span><span class='line'>      <span class="k">else</span>
+</span><span class='line'>        <span class="k">super</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>关键部分是 <code>append_features</code> 方法，通过阅读 ruby 的文档和源码得知，ruby 在 include 一个 module 时，实际会触发两个方法，一个是 append_features，进行实际的 mixing 操作，包括增加常量，方法和变量到模块中，另外一个是 included 方法，也就是我们常用来作为 include 钩子的方法，默认的 included 是一个空方法，我们通过重载它使钩子起作用。</p>
+
+<p>从代码可知，当一个模块 <code>extend ActiveSupport::Concern</code> 时，将产生 3 个影响：</p>
+
+<ol>
+<li>为模块设置了一个实例变量</li>
+</ol>
+
+
+<p>变量为 @_dependencies，其值为空数组，表示依赖的模块，将在 append_features 中用到；</p>
+
+<ol>
+<li>append_features 方法被重载；</li>
+</ol>
+
+
+<p>重载后行为有了很大变化，它的处理分两种情况：
+一种是当它被一个有 @<em>dependencies 实例变量的模块被 include 时，直接把自身加到 @</em>dependencies 中，
+比如当 Bar include Foo 时，将触发 Foo 的 append_features(base) 方法，此时 base 是 Bar，self 是 Foo，由于 Bar 已经 <code>extend ActiveSupport::Concern</code>，Bar 的 @<em>dependencies 有定义，所以直接把 Foo 加到 Bar 的 @</em>dependencies 中，然后直接返回，没有立即执行 mixing 操作。</p>
+
+<p>当 Host include Bar 时，将触发 Bar 的 append_features(base) 方法，此时
+base 是 Host，self 是 Bar，Host 没有 <code>extend ActiveSupport::Concern</code>，所以 Host 的 @<em>dependencies 无定义，将执行下面的分支，首先 include Foo（通过 Bar 的 @</em>dependencies 获得 ），然后 include Bar (通过 super)，然后是后续操作。</p>
+
+<ol>
+<li>included 方法被重载；</li>
+</ol>
+
+
+<p>included 的动作比较简单，如果以没有参数形式调用，将把 block 存放到 @<em>included_block 变量中，@</em>included_block 的 block 将在 append_features 方法中使用。</p>
+
+<p>通过施加的这 3 个影响，ActiveSupport::Concern 完成了它的全部功能，非常简洁精练。</p>
+
+<p>从中学到的东西，包括：</p>
+
+<ol>
+<li><p>module 中 append_features 和 included 方法时 include 的核心；</p></li>
+<li><p>可以通过覆盖这些方法改变操作的行为；</p></li>
+<li><p>可以定义模块实例变量存储属于该模块的一些数据；</p></li>
+</ol>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1967,197 +2225,6 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/">Ruby的运算符和语句优先级</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-11-25T22:03:00+08:00" pubdate data-updated="true">2012-11-25</time>
-        
-         | <a href="/blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby 是一种表达能力很强的语言，这得意于它异常丰富的运算符和语法糖，虽然 Ruby 一直把最小惊讶原则作为它的哲学之一，但还是常常看到让人惊讶不已，难于理解的代码，这可能是因为对它运算符和语句优先级理解不透导致，今天就和大家聊一聊 Ruby 运算符和语句的优先级。</p>
-
-<p>先看一句简单的代码，猜一猜它的输出是什么。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="nb">puts</span> <span class="p">{}</span><span class="o">.</span><span class="n">class</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>很多人一定以为结果是 Hash，但实事上结果是空，不信可以在 irb 里试一试。</p>
-
-<p>再看一段代码。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 &amp;&amp; 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 and 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span class='line'><span class="n">a</span> <span class="o">=</span> <span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span>
-</span><span class='line'><span class="n">b</span> <span class="o">=</span> <span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;b is </span><span class="si">#{</span><span class="n">b</span><span class="si">}</span><span class="s2">&quot;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>结果是：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
-</span><span class='line'><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
-</span><span class='line'><span class="n">a</span> <span class="n">is</span> <span class="mi">3</span>
-</span><span class='line'><span class="n">b</span> <span class="n">is</span> <span class="mi">5</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>有没有觉得奇怪 b 怎么是 5 而不是 3 呢。</p>
-
-<p>如果这两个例子你也觉得奇怪，那说明你对 Ruby 一些运算符和语句的优先级理解还不透彻，判断有误。
-<code>puts {}.class</code> 实际上相当于 <code>(puts {}).class</code> -> <code>nil.class</code> 所以输出为空。<code>{}</code>相当于一个空的 block，优先和方法 puts 结合。
-<code>&amp;&amp; 和 and</code> 的优先是不同的，而且和 <code>=</code> 号的优先级顺序比较， <code>&amp;&amp; &gt; = &gt; and</code>，所以 <code>a = 5 &amp;&amp; 3</code> 相当于 <code>a = ( 5 &amp;&amp; 3)</code>，而 <code>b = 5 and 3</code> 相当于 <code>( b = 5 ) and 3</code>，所以结果 a 和 b的值是不同的。</p>
-
-<p>下面一张表格是 Ruby 中常见的运算符和语句的优先级列表，从上到下优先级递减。</p>
-
-<table border="1" cellspacing="0">
-<tr style="background:#efefef;">
-  <caption>Ruby operators (highest to lowest precedence)</caption>
-  <tr style="background:#efefef;">
-    <th>Method</th>
-    <th>Operator</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td>Yes</td>
-    <td><code>[ ]</code> <code>[ ]=</code></td>
-    <td>Element reference, element set</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>**</code></td>
-    <td>Exponentiation (raise to the power)</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>!</code> <code>~</code> <code>+</code> <code>-</code></td>
-    <td>Not, complement, unary plus and minus (method names for the last two are <code>+@</code> and <code>-@</code>)</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>*</code> <code>/</code> <code>%</code></td>
-    <td>Multiply, divide, and modulo</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>+</code> <code>-</code></td>
-    <td>Addition and subtraction</td>
-  </tr><tr>
-
-    <td>Yes</td>
-    <td><code>&gt;&gt;</code> <code>&lt;&lt;</code></td>
-    <td>Right and left bitwise shift</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>&amp;</code></td>
-    <td>Bitwise `AND&#8217;</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>^</code> <code>|</code></td>
-    <td>Bitwise exclusive `OR&#8217; and regular `OR&#8217;</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>&lt;=</code> <code>&lt;</code> <code>&gt;</code> <code>&gt;=</code></td>
-    <td>Comparison operators</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>&lt;=&gt;</code> <code>==</code> <code>===</code> <code>!=</code> <code>=~</code> <code>!~</code></td>
-    <td>Equality and pattern match operators (<code>!=</code> and <code>!~</code> may not be defined as methods)</td>
-  </tr><tr>
-    <td></td>
-    <td><code>&amp;&amp;</code></td>
-    <td>Logical `AND&#8217;</td>
-  </tr><tr>
-    <td></td>
-    <td><code>||</code></td>
-    <td>Logical `AND&#8217;</td>
-  </tr><tr>
-    <td></td>
-    <td><code>..</code> <code>...</code></td>
-    <td>Range (inclusive and exclusive)</td>
-  </tr><tr>
-    <td></td>
-    <td><code>?&nbsp;:</code></td>
-    <td>Ternary if-then-else</td>
-  </tr><tr>
-    <td></td>
-    <td><code>=</code> <code>%=</code> <code></code>{ <code>/=</code> <code>-=</code> <code>+=</code> <code>|=</code> <code>&amp;=</code> <code>&gt;&gt;=</code> <code>&lt;&lt;=</code> <code>*=</code> <code>&amp;&amp;=</code> <code>||=</code> <code>**=</code></td>
-    <td>Assignment</td>
-  </tr><tr>
-    <td></td>
-    <td><code>defined?</code></td>
-    <td>Check if specified symbol defined</td>
-  </tr><tr>
-    <td></td>
-    <td><code>not</code></td>
-    <td>Logical negation</td>
-  </tr><tr>
-    <td></td>
-    <td><code>or</code> <code>and</code></td>
-    <td>Logical composition</td>
-  </tr><tr>
-    <td></td>
-    <td><code>if</code> <code>unless</code> <code>while</code> <code>until</code></td>
-    <td>Expression modifiers</td>
-  </tr><tr>
-
-    <td></td>
-    <td><code>begin/end</code></td>
-    <td>Block expression</td>
-  </tr>
-</table>
-
-
-<br/>
-
-
-<p>几条便于记忆的原则：</p>
-
-<ol>
-<li>关键字类如if and 等的优先级是要比符号类低；</li>
-<li>赋值符号 <code>= ||=</code> 等优先级也比较低，仅次于关键字类；</li>
-<li><code>[] []=</code> 元素引用的优先级非常高。</li>
-</ol>
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -2175,6 +2242,10 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
       </li>
     
@@ -2188,10 +2259,6 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
     
       <li class="post">
         <a href="/blog/2014/07/06/redis-use-pattern-1-counter/">Redis 使用模式之一：计数器</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/06/29/build-index-in-mongodb/">MongoDB 中建索引注意事项</a>
       </li>
     
   </ul>

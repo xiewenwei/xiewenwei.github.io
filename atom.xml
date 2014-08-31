@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-08-11T00:37:20+08:00</updated>
+  <updated>2014-09-01T00:23:10+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -12,6 +12,29 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[避免误用 Redis]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/08/31/avoid-misusing-redis/"/>
+    <updated>2014-08-31T23:29:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/08/31/avoid-misusing-redis</id>
+    <content type="html"><![CDATA[<p>Redis 是目前 NoSQL 领域的当红炸子鸡，它象一把瑞士军刀，小巧、锋利、实用，特别适合解决一些使用传统关系数据库难以解决的问题。但是 Redis 不是银弹，有很多适合它解决的问题，但是也有很多并不适合它解决的问题。另外，Redis 作为内存数据库，如果用在不适合的场合，对内存的消耗是很可观的，甚至会让系统难以承受。</p>
+
+<p>我们可以对系统存储使用的数据以两种角度分类，一种是按数据的大小划分，分成大数据和小数据，另一种是按数据的冷热程度划分，分成冷数据和热数据，热数据是指读或写比较频繁的数据，反之则是冷数据。</p>
+
+<p>可以举一些具体的例子来说明数据的大小和冷热属性。比如网站总的注册用户数，这明显是一个小而热的数据，小是因为这个数据只有一个值，热是因为注册用户数随时间变化很频繁。再比如，用户最新访问时间数据，这是一个量比较大，冷热不均的数据，大是数据的粒度是用户级别，每一个用户都有数据，如果有一千万用户，就意味着有一千万的数据，冷热不均是因为活跃用户的最新访问时间变化很频繁，但是可能有很大一部非活跃用户访问时间长时间不会发生变化。</p>
+
+<p>大体而言，Redis 最适合处理的是小而热，而且是写频繁，或者读写都比较频繁的热数据。对于大而热的数据，如果其它方式很难解决问题，也可以考虑使用 Redis 解决，但是一定要非常谨慎，防止数据无限膨胀。原因如下：</p>
+
+<p>首先，对于冷数据，无论大小，都不建议放在 Redis 中。Redis 数据要全部放在内存中，资源宝贵，把冷数据放在其中实在是一种浪费，冷数据放在普通的存储比如关系数据库中就好了。</p>
+
+<p>其次，对于热数据，尤其是写频繁的热数据，如果量比较小，是最适合放到 Redis 中的。比如上面提到的网站总的注册用户数，就是典型的 Redis 用做计数器的例子。再比如论坛最新发表列表，最新报名列表，可以控制数量在几百到一千的规模，也是典型的 redis 做最新列表的使用方式。</p>
+
+<p>另外，对于量比较大的热数据（或者冷热不均数据），使用 Redis 时一定要比较谨慎。这种类型数据很容易引起数据膨胀，导致 Redis 消耗内存巨大，让系统难以承受。薄荷的一个惨痛教训是把用户关注（以及被关注）数据放在 Redis 中，这是一种数据量极大，冷热很不均衡的数据，在几百万的用户级别就占用了近 10 GB左右内存，让 Redis 变得难以应付。应对这种类型的数据，可以用普通存储 + 缓存的方式。</p>
+
+<p>如果用对了地方，比如在小而热的数据情形，Redis 表现很棒，如果用错了地方，Redis 也会带来昂贵的代价，所以使用时务必谨慎。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[实例探索 Git 的分支 branch 和标签 tag]]></title>
@@ -2458,168 +2481,6 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
 <ol>
 <li><a href="https://github.com/seattlerb/minitest">minitest home</a></li>
 <li><a href="https://github.com/blowmage/minitest-rails">minitest-rails home</a></li>
-</ol>
-
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Ruby的运算符和语句优先级]]></title>
-    <link href="http://xiewenwei.github.com//blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji/"/>
-    <updated>2012-11-25T22:03:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2012/11/25/rubyde-yun-suan-fu-he-yu-ju-you-xian-ji</id>
-    <content type="html"><![CDATA[<p>Ruby 是一种表达能力很强的语言，这得意于它异常丰富的运算符和语法糖，虽然 Ruby 一直把最小惊讶原则作为它的哲学之一，但还是常常看到让人惊讶不已，难于理解的代码，这可能是因为对它运算符和语句优先级理解不透导致，今天就和大家聊一聊 Ruby 运算符和语句的优先级。</p>
-
-<p>先看一句简单的代码，猜一猜它的输出是什么。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="nb">puts</span> <span class="p">{}</span><span class="o">.</span><span class="n">class</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>很多人一定以为结果是 Hash，但实事上结果是空，不信可以在 irb 里试一试。</p>
-
-<p>再看一段代码。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 &amp;&amp; 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;5 and 3 is </span><span class="si">#{</span><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span class='line'><span class="n">a</span> <span class="o">=</span> <span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span>
-</span><span class='line'><span class="n">b</span> <span class="o">=</span> <span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;b is </span><span class="si">#{</span><span class="n">b</span><span class="si">}</span><span class="s2">&quot;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>结果是：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="mi">5</span> <span class="o">&amp;&amp;</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
-</span><span class='line'><span class="mi">5</span> <span class="ow">and</span> <span class="mi">3</span> <span class="n">is</span> <span class="mi">3</span>
-</span><span class='line'><span class="n">a</span> <span class="n">is</span> <span class="mi">3</span>
-</span><span class='line'><span class="n">b</span> <span class="n">is</span> <span class="mi">5</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>有没有觉得奇怪 b 怎么是 5 而不是 3 呢。</p>
-
-<p>如果这两个例子你也觉得奇怪，那说明你对 Ruby 一些运算符和语句的优先级理解还不透彻，判断有误。
-<code>puts {}.class</code> 实际上相当于 <code>(puts {}).class</code> -> <code>nil.class</code> 所以输出为空。<code>{}</code>相当于一个空的 block，优先和方法 puts 结合。
-<code>&amp;&amp; 和 and</code> 的优先是不同的，而且和 <code>=</code> 号的优先级顺序比较， <code>&amp;&amp; &gt; = &gt; and</code>，所以 <code>a = 5 &amp;&amp; 3</code> 相当于 <code>a = ( 5 &amp;&amp; 3)</code>，而 <code>b = 5 and 3</code> 相当于 <code>( b = 5 ) and 3</code>，所以结果 a 和 b的值是不同的。</p>
-
-<p>下面一张表格是 Ruby 中常见的运算符和语句的优先级列表，从上到下优先级递减。</p>
-
-<table border="1" cellspacing="0">
-<tr style="background:#efefef;">
-  <caption>Ruby operators (highest to lowest precedence)</caption>
-  <tr style="background:#efefef;">
-    <th>Method</th>
-    <th>Operator</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td>Yes</td>
-    <td><code>[ ]</code> <code>[ ]=</code></td>
-    <td>Element reference, element set</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>**</code></td>
-    <td>Exponentiation (raise to the power)</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>!</code> <code>~</code> <code>+</code> <code>-</code></td>
-    <td>Not, complement, unary plus and minus (method names for the last two are <code>+@</code> and <code>-@</code>)</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>*</code> <code>/</code> <code>%</code></td>
-    <td>Multiply, divide, and modulo</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>+</code> <code>-</code></td>
-    <td>Addition and subtraction</td>
-  </tr><tr>
-
-    <td>Yes</td>
-    <td><code>&gt;&gt;</code> <code>&lt;&lt;</code></td>
-    <td>Right and left bitwise shift</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>&amp;</code></td>
-    <td>Bitwise `AND&#8217;</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>^</code> <code>|</code></td>
-    <td>Bitwise exclusive `OR&#8217; and regular `OR&#8217;</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>&lt;=</code> <code>&lt;</code> <code>&gt;</code> <code>&gt;=</code></td>
-    <td>Comparison operators</td>
-  </tr><tr>
-    <td>Yes</td>
-    <td><code>&lt;=&gt;</code> <code>==</code> <code>===</code> <code>!=</code> <code>=~</code> <code>!~</code></td>
-    <td>Equality and pattern match operators (<code>!=</code> and <code>!~</code> may not be defined as methods)</td>
-  </tr><tr>
-    <td></td>
-    <td><code>&amp;&amp;</code></td>
-    <td>Logical `AND&#8217;</td>
-  </tr><tr>
-    <td></td>
-    <td><code>||</code></td>
-    <td>Logical `AND&#8217;</td>
-  </tr><tr>
-    <td></td>
-    <td><code>..</code> <code>...</code></td>
-    <td>Range (inclusive and exclusive)</td>
-  </tr><tr>
-    <td></td>
-    <td><code>?&nbsp;:</code></td>
-    <td>Ternary if-then-else</td>
-  </tr><tr>
-    <td></td>
-    <td><code>=</code> <code>%=</code> <code></code>{ <code>/=</code> <code>-=</code> <code>+=</code> <code>|=</code> <code>&amp;=</code> <code>&gt;&gt;=</code> <code>&lt;&lt;=</code> <code>*=</code> <code>&amp;&amp;=</code> <code>||=</code> <code>**=</code></td>
-    <td>Assignment</td>
-  </tr><tr>
-    <td></td>
-    <td><code>defined?</code></td>
-    <td>Check if specified symbol defined</td>
-  </tr><tr>
-    <td></td>
-    <td><code>not</code></td>
-    <td>Logical negation</td>
-  </tr><tr>
-    <td></td>
-    <td><code>or</code> <code>and</code></td>
-    <td>Logical composition</td>
-  </tr><tr>
-    <td></td>
-    <td><code>if</code> <code>unless</code> <code>while</code> <code>until</code></td>
-    <td>Expression modifiers</td>
-  </tr><tr>
-
-    <td></td>
-    <td><code>begin/end</code></td>
-    <td>Block expression</td>
-  </tr>
-</table>
-
-
-<br/>
-
-
-<p>几条便于记忆的原则：</p>
-
-<ol>
-<li>关键字类如if and 等的优先级是要比符号类低；</li>
-<li>赋值符号 <code>= ||=</code> 等优先级也比较低，仅次于关键字类；</li>
-<li><code>[] []=</code> 元素引用的优先级非常高。</li>
 </ol>
 
 ]]></content>
