@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Ruby 是一种表达能力很强的语言，这得意于它异常丰富的运算符和语法糖，虽然 Ruby 一直把最小惊讶原则作为它的哲学之一，但还是常常看到让人惊讶不已，难于理解的代码，这可能是因为对它运算符和语句优先级理解不透导致，今天就和大家聊一聊 Ruby 运算符和语句的优先级。 先看一句简单的代码， &hellip;">
+  <meta name="description" content="MiniTest 是新一代的 Ruby 测试框架，它已经成为 Ruby 1.9 的内置测试框架，据说它也将成为Rails 4的默认测试框架，可谓前途一片光明。 MiniTest 为什么成为最新 Ruby 和 Rails 的首选，它有哪些吸引人的东西呢？ Ruby 1.8时代，Ruby 和 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,121 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/">TestUnit的替代者MiniTest</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-02T22:07:00+08:00" pubdate data-updated="true">2012-12-02</time>
+        
+         | <a href="/blog/2012/12/02/test-unitde-ti-dai-zhe-minitest/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>MiniTest 是新一代的 Ruby 测试框架，它已经成为 Ruby 1.9 的内置测试框架，据说它也将成为Rails 4的默认测试框架，可谓前途一片光明。</p>
+
+<h2>MiniTest 为什么成为最新 Ruby 和 Rails 的首选，它有哪些吸引人的东西呢？</h2>
+
+<p>Ruby 1.8时代，Ruby 和 Rails 的默认测试框架都是 TestUnit，TestUnit 历史悠久，它最大的问题是太慢，太臃肿了，它包含了一堆现在很少使用的第三方库，比如GTk v1, GTk v2, FxRuby，另外一个大问题的是它缺乏一些基本的测试特性，比如 spec DSL的测试风格，比如 mock 支持等等。</p>
+
+<p>MiniTest 相当于对 TestUnit 做了一次大的重构翻新，它继承了 TestUnit 大部分用法，消除 TestUnit 中不恰当的依赖，另外增加了基本的测试特性，比如 spec 和 mock等，整体上变得相当快速，简单整洁。</p>
+
+<p>在 Ruby 和 Rails 的世界，有一个测试框架 Rspec 使用也是非常广泛的，甚至目前使用广泛程度超过 TestUnit 和 MiniTest，它为什么没有成为默认框架呢？我想 MiniTest 相对于 Rspec 最大的优势是简单和延续性，Rspec 相比 MiniTest 要庞大复杂得多，当然功能也更强大，对于内置 Ruby 的类库来说，还是简单和保持延续（相对 TestUnit）更有优势。对于 Rails 来说，Rails 之父 DHH 和 Rspec 一直对不上眼，我想是 Rails 最终选择 MiniTest 最大的原因，哈哈。</p>
+
+<h2>MiniTest 使用示例</h2>
+
+<p>如果你用过 TestUnit，MiniTest 使用非常简单，下面是一个测试的 Hello World</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">HelloWold</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">get_word</span>
+</span><span class='line'>    <span class="s2">&quot;Hello World!&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>测试代码</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;minitest/autorun&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">HelloWoldTest</span> <span class="o">&lt;</span> <span class="no">MiniTest</span><span class="o">::</span><span class="no">Unit</span><span class="o">::</span><span class="no">TestCase</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">test_get_word</span>
+</span><span class='line'>    <span class="n">assert_equal</span> <span class="s2">&quot;Hello World!&quot;</span><span class="p">,</span> <span class="no">HelloWold</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">get_word</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>测试代码, spec风格</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;minitest/autorun&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">describe</span> <span class="no">HelloWold</span> <span class="k">do</span>
+</span><span class='line'>  <span class="n">it</span> <span class="s2">&quot;should return hello world&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="no">HelloWold</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">get_word</span><span class="o">.</span><span class="n">must_equal</span> <span class="s2">&quot;Hello World!&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><strong>如果要在 Rails 项目使用 MiniTest，可以使用 gem minitest-rails</strong>，使用 <code>minitest-rails</code> 之后，rails generator 生成的 test 就都转换为 minitest 风格代码。</p>
+
+<h2>总结</h2>
+
+<p>MiniTest 相当简单快速，它延续 TestUnit用法，上手非常快，同时它又提供了一些非常棒的特性，试用下来觉得非常不错，难怪它成为最新 Ruby 和 Rails 的首选，我打算今后就用它了。</p>
+
+<h2>参考资料</h2>
+
+<ol>
+<li><a href="https://github.com/seattlerb/minitest">minitest home</a></li>
+<li><a href="https://github.com/blowmage/minitest-rails">minitest-rails home</a></li>
+</ol>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -841,6 +956,10 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
       </li>
     
@@ -854,10 +973,6 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
     
       <li class="post">
         <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/07/06/redis-use-pattern-1-counter/">Redis 使用模式之一：计数器</a>
       </li>
     
   </ul>

@@ -1,0 +1,258 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>http 抓包分析工具 pproxy - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="引言 web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/10/26/a-http-sniffer-tool-pproxy/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">http 抓包分析工具 pproxy</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-10-26T23:26:00+08:00" pubdate data-updated="true">2014-10-26</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><h2>引言</h2>
+
+<p>  web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app 大流行的时代，想要观察 app 中得 http 请求的秘密，浏览器的工具和插件都无能为力，有不少本地化的软件可以很好的解决这个问题，Windows 平台下有大名鼎鼎的 Fiddler 和 HttpWatch，Mac 平台下有 Charles。Charles 是一个收费软件，价格不菲要 $50。钱还不是关键问题，作为一名 geek，当然想更向往开源，轻量的解决方案了，无意中发现 pproxy，简单使用了一下，觉得相当棒，可以做了绝佳的替代方案。</p>
+
+<h2>比较</h2>
+
+<p>  pproxy 和 Fiddler、Charles 最大的不同是，它是一个开源软件，使用 go 编写，代码托管在 github 上。因为开源，作为一名 geek，就可以通过阅读源代码对其工作机制一探究竟，如果发觉某些方面不能满足需求，可以直接向开发者提需求，也可以自己动手，丰衣足食，造福大众。</p>
+
+<p>  pproxy 的工作机制和本地化软件如 Fiddler、Charles 差别很大。Fiddler 和 Charles 是一个本地化软件，通常是安装在桌面电脑上，通过在桌面电脑建立 proxy，然后截获的 http 请求和响应数据，提供一个本地化的 UI 界面提供服务。而 pproxy 是一个服务端软件，通常安装在 Linux 服务器上（当然也是可以安装在桌面电脑上），在服务器上建立 proxy 截获 http 请求和响应数据，另外提供一个远程的基于 web (html5)的 UI 界面提供服务。</p>
+
+<p>  Fiddler UI 如下所示：</p>
+
+<p>  <img src="/images/house/fiddler.gif" alt="Fiddler UI" /></p>
+
+<p>  pproxy UI 如下所示：</p>
+
+<p>  <img src="/images/house/pproxy.png" alt="pproxy UI" /></p>
+
+<h2>使用</h2>
+
+<p>  pproxy 使用比较简单，具体可以参考其使用说明 <a href="https://github.com/hidu/pproxy">pproxy</a>。
+  难得的是他的作者是中国人，所以说明都是中文的。</p>
+
+<h2>总结</h2>
+
+<p>  pproxy 是一个开源的轻巧的 http 抓包分析工具，尤其适合 API http 请求分析，完全可以替换昂贵的收费工具，同时也可以探索其源码学习 GO 语言，学习 http 协议和分析方法。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-10-26T23:26:00+08:00" pubdate data-updated="true">2014-10-26</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/http/'>http</a>, <a class='category' href='/blog/categories/pproxy/'>pproxy</a>, <a class='category' href='/blog/categories/sniffer/'>sniffer</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/08/31/avoid-misusing-redis/" title="Previous Post: 避免误用 Redis">&laquo; 避免误用 Redis</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/10/26/a-http-sniffer-tool-pproxy/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/10/26/a-http-sniffer-tool-pproxy/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

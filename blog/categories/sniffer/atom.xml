@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: sniffer | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/sniffer/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-10-27T00:07:31+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[http 抓包分析工具 pproxy]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/10/26/a-http-sniffer-tool-pproxy/"/>
+    <updated>2014-10-26T23:26:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/10/26/a-http-sniffer-tool-pproxy</id>
+    <content type="html"><![CDATA[<h2>引言</h2>
+
+<p>  web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app 大流行的时代，想要观察 app 中得 http 请求的秘密，浏览器的工具和插件都无能为力，有不少本地化的软件可以很好的解决这个问题，Windows 平台下有大名鼎鼎的 Fiddler 和 HttpWatch，Mac 平台下有 Charles。Charles 是一个收费软件，价格不菲要 $50。钱还不是关键问题，作为一名 geek，当然想更向往开源，轻量的解决方案了，无意中发现 pproxy，简单使用了一下，觉得相当棒，可以做了绝佳的替代方案。</p>
+
+<h2>比较</h2>
+
+<p>  pproxy 和 Fiddler、Charles 最大的不同是，它是一个开源软件，使用 go 编写，代码托管在 github 上。因为开源，作为一名 geek，就可以通过阅读源代码对其工作机制一探究竟，如果发觉某些方面不能满足需求，可以直接向开发者提需求，也可以自己动手，丰衣足食，造福大众。</p>
+
+<p>  pproxy 的工作机制和本地化软件如 Fiddler、Charles 差别很大。Fiddler 和 Charles 是一个本地化软件，通常是安装在桌面电脑上，通过在桌面电脑建立 proxy，然后截获的 http 请求和响应数据，提供一个本地化的 UI 界面提供服务。而 pproxy 是一个服务端软件，通常安装在 Linux 服务器上（当然也是可以安装在桌面电脑上），在服务器上建立 proxy 截获 http 请求和响应数据，另外提供一个远程的基于 web (html5)的 UI 界面提供服务。</p>
+
+<p>  Fiddler UI 如下所示：</p>
+
+<p>  <img src="/images/house/fiddler.gif" alt="Fiddler UI" /></p>
+
+<p>  pproxy UI 如下所示：</p>
+
+<p>  <img src="/images/house/pproxy.png" alt="pproxy UI" /></p>
+
+<h2>使用</h2>
+
+<p>  pproxy 使用比较简单，具体可以参考其使用说明 <a href="https://github.com/hidu/pproxy">pproxy</a>。
+  难得的是他的作者是中国人，所以说明都是中文的。</p>
+
+<h2>总结</h2>
+
+<p>  pproxy 是一个开源的轻巧的 http 抓包分析工具，尤其适合 API http 请求分析，完全可以替换昂贵的收费工具，同时也可以探索其源码学习 GO 语言，学习 http 协议和分析方法。</p>
+]]></content>
+  </entry>
+  
+</feed>
