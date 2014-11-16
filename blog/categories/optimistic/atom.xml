@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: optimistic | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/optimistic/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-11-16T23:28:57+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[如何解决 Rails 中同时修改冲突]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/"/>
+    <updated>2014-11-16T22:51:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/11/16/how-to-resolve-updating-conflict-in-rails</id>
+    <content type="html"><![CDATA[<p>Rails 应用程序中操作冲突是一个常见问题，Rails 提供了简单有效的解决方法。</p>
+
+<p>举一个实际的例子：我们的系统里有一个商店模块，商店中重要的一块是对产品信息的管理，比如运营人员常常会编辑产品的信息，包括产品标题，营销口号和价格等等。因为修改十分频繁，碰巧同时编辑提交修改的话，就会偶尔遇到修改丢失的问题，运营人员 A 修改产品标题，运营人员 B 修改价格，A 和 B 提交修改都提示修改成功，但是结果上只是 A 的修改结果生效，B 的修改被 A 的修改冲掉了。</p>
+
+<p>仔细研究原因，发现是因为修改功能缺少操作冲突机制，而修改操作同时发生导致了问题。
+如下图所示，A 和 B 同时从数据库中查询数据，在 web 页面中修改同样的数据，提交保存时是以 web 页面中提交的数据为准，从而导致 A 的修改把 B 的修改给覆盖了。</p>
+
+<p><img src="/images/house/rails_conflict.png" alt="A和B修改冲突" /></p>
+
+<p>Rails 的 乐观锁<a href="http://api.rubyonrails.org/classes/ActiveRecord/Locking/Optimistic.html">Optimistic Locking</a> 是解决这个问题的有力工具，它的原理是在数据库表中增加一个字段（默认是 lock_version，可配置）记录数据的版本号，每个提交的修改都带上这个版本号，在真正 update 修改数据之前，先判断提交的 lock_version 数据和数据库中的是否一致，如果不一致，则认为发生数据冲突，将抛出 <code>ActiveRecord::StaleObjectError</code> 异常，这样程序就可以捕获这个异常，提醒用户发生了冲突，由用户去协调解决冲突。</p>
+
+<p>相关示例代码如下所示：</p>
+
+<p>```ruby</p>
+
+<h1>migration: add lock_version to products</h1>
+
+<p>add_column :products, :lock_version, :integer, defalut: 0</p>
+
+<h1>update product with StaleObjectError checking</h1>
+
+<p>begin
+  product.update(params[:product])
+rescue ActiveRecord::StaleObjectError
+  render 'confilct'
+end</p>
+
+<p>```</p>
+]]></content>
+  </entry>
+  
+</feed>

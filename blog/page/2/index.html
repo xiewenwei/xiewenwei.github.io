@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="薄荷 App 上的伙伴功能大量使用了内存数据库 Redis，随着数据量的快速增长，Redis 膨胀得很快，已经接近 12 GB规模，这些数据全部放在单个 Redis 实例中。单个巨大 Redis 实例有如下几个坏处： 首先，需要一台内存很大的机器。Redis 是内存数据库， &hellip;">
+  <meta name="description" content="Redis 是非常流行的 key-value 类型的 NOSQL 数据库，它的 value 数据类型丰富多样，适合解决很多对关系数据库来说棘手的问题。Redis 是内存数据库，也就是说它把所有的数据都放在内存中。众所周知，当前机器突然断电或者系统异常崩溃时，内存的数据会丢失的， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,52 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-16T00:08:00+08:00" pubdate data-updated="true">2014-06-16</time>
+        
+         | <a href="/blog/2014/06/16/redis-data-protection/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Redis 是非常流行的 key-value 类型的 NOSQL 数据库，它的 value 数据类型丰富多样，适合解决很多对关系数据库来说棘手的问题。Redis 是内存数据库，也就是说它把所有的数据都放在内存中。众所周知，当前机器突然断电或者系统异常崩溃时，内存的数据会丢失的，所以如果把系统的关键数据放在 Redis 中必须做好保护措施。</p>
+
+<p>Redis 提供了两种持久化数据机制：</p>
+
+<p>一种是 RDB 机制。这种方式是把当前整个 Redis 内存数据快照写到磁盘上。优点是比较简单，恢复快速。缺点是代价比较昂贵，尤其当数据量很大时，会严重影响到 Redis（照成 Redis 停顿），而且会极度消耗磁盘 IO。</p>
+
+<p>另一种是 AppendOnly 机制。这种方式类似于 log，把数据操作命令全部存入 log 文件。优点是每段时间写入数据不是很大，可以设置很短的写入时间间隔（比如1秒钟）。缺点是 log 文件可能会远大于数据文件，通常会是数据文件大小的 3~5 倍，而且恢复的时间要远大于 RDB 方式的恢复时间。</p>
+
+<p>这两种机制各有优劣，不过它们是可以结合起来使用的。在实际使用过程，通常还结合 Redis 的 slave 功能，做到对 Redis 影响更小，保护更充分。具体的做法是对 Redis 建立 master 和 slave，在 master 上根本不使用任何持久化机制，只在 slave 上建立结合 RDB 和 AppendOnly 的持久化机制。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1902,288 +1948,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/12/09/ruby-constant-lookup/">Ruby 常量查找路径</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-12-09T21:44:00+08:00" pubdate data-updated="true">2012-12-09</time>
-        
-         | <a href="/blog/2012/12/09/ruby-constant-lookup/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby 的常量查找路径问题是一直困扰我的一个问题，在工作中遇到过好几次，一直没有彻底弄清楚到底为什么，最近在读一本书《Ruby 元编程》，对 Ruby 对象模型有了更深入的认识，另外读了一篇 blog《Everything you ever wanted to know about constant lookup in Ruby》, 让我总算把 Ruby 常量查找路径这个问题搞得比较清楚。</p>
-
-<h2>第一个遇到的问题，我还曾经在 Ruby-China 上发过帖。</h2>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">M1</span>
-</span><span class='line'>  <span class="no">CT</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">class</span> <span class="nc">C1</span>
-</span><span class='line'>  <span class="no">CK</span> <span class="o">=</span> <span class="s2">&quot;ck&quot;</span>
-</span><span class='line'>  <span class="kp">include</span> <span class="no">M1</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">method1</span>
-</span><span class='line'>    <span class="nb">puts</span> <span class="nb">self</span>
-</span><span class='line'>    <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CK</span><span class="si">}</span><span class="s2"> in method1&quot;</span>
-</span><span class='line'>    <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CT</span><span class="si">}</span><span class="s2"> in method1&quot;</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">class</span> <span class="o">&lt;&lt;</span> <span class="nb">self</span>
-</span><span class='line'>    <span class="k">def</span> <span class="nf">method2</span>
-</span><span class='line'>      <span class="nb">puts</span> <span class="nb">self</span>
-</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CK</span><span class="si">}</span><span class="s2"> in method1&quot;</span>
-</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">CT</span><span class="si">}</span><span class="s2"> in method2&quot;</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="no">C1</span><span class="o">.</span><span class="n">method1</span>
-</span><span class='line'><span class="no">C1</span><span class="o">.</span><span class="n">method2</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>输出结果是</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">C1</span>
-</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method1</span>
-</span><span class='line'><span class="n">ok</span> <span class="k">in</span> <span class="n">method1</span>
-</span><span class='line'><span class="no">C1</span>
-</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method2</span>
-</span><span class='line'><span class="no">NameError</span><span class="p">:</span> <span class="n">uninitialized</span> <span class="n">constant</span> <span class="no">Class</span><span class="o">::</span><span class="no">CT</span>
-</span><span class='line'>    <span class="n">from</span> <span class="p">(</span><span class="n">irb</span><span class="p">):</span><span class="mi">16</span><span class="ss">:in</span> <span class="sb">`method2&#39;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这是我在重构薄荷网代码时候遇到的问题，method1 和 method2 都是常见的类方法的定义方面，我向来认为它们是等价可替换的写法，但是从实际执行的结果看，它们里面的常量查找路径不一样。</p>
-
-<p>如果我把 M1 的定义改成下面的样子：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">M1</span>
-</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">included</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
-</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">self</span><span class="p">)</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>  <span class="no">CT</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>执行结果是：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">C1</span>
-</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method1</span>
-</span><span class='line'><span class="n">ok</span> <span class="k">in</span> <span class="n">method1</span>
-</span><span class='line'><span class="no">C1</span>
-</span><span class='line'><span class="n">ck</span> <span class="k">in</span> <span class="n">method2</span>
-</span><span class='line'><span class="n">ok</span> <span class="k">in</span> <span class="n">method2</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<h2>还有一个问题是也是经常遇到的，抽象成问题代码如下：</h2>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">A</span>
-</span><span class='line'>  <span class="k">module</span> <span class="nn">M</span>
-</span><span class='line'>    <span class="k">def</span> <span class="nf">a_method</span>
-</span><span class='line'>      <span class="c1">#...</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">class</span> <span class="nc">A</span><span class="o">::</span><span class="n">B</span>
-</span><span class='line'>  <span class="kp">include</span> <span class="n">M</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>会报异常：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">NameError</span><span class="p">:</span> <span class="n">uninitialized</span> <span class="n">constant</span> <span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="o">::</span><span class="n">M</span>
-</span><span class='line'>  <span class="n">from</span> <span class="p">(</span><span class="n">irb</span><span class="p">):</span><span class="mi">10</span><span class="ss">:in</span> <span class="sb">`&lt;class:B&gt;&#39;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<h2>Ruby 常量查找时依据两条路径</h2>
-
-<ul>
-<li>A. Module.nesting</li>
-<li>B. open class/module 的 ancestors</li>
-</ul>
-
-
-<p>A 比 B 优先，A 找不到了才到 B 中查找。</p>
-
-<p><code>A.Module.nesting</code> 的概念比较容易理解，它是指代码位置的 module 嵌套情况，它是一个数组，从最内层的嵌套一直到最外层的嵌套，如果没有嵌套，数组为空。任何一处代码位置都有 <code>Module.nesting</code> 值，可以通过下面的代码打印出各个位置的 Module.nesting 值。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">module</span> <span class="nn">A</span>
-</span><span class='line'>  <span class="k">module</span> <span class="nn">B</span>
-</span><span class='line'>    <span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
-</span><span class='line'>    <span class="k">module</span> <span class="nn">C</span>
-</span><span class='line'>      <span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">module</span> <span class="nn">A::B</span>
-</span><span class='line'>  <span class="nb">p</span> <span class="no">Module</span><span class="o">.</span><span class="n">nesting</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>输出是：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="o">[]</span>
-</span><span class='line'><span class="o">[</span><span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="p">,</span> <span class="n">A</span><span class="o">]</span>
-</span><span class='line'><span class="o">[</span><span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="o">::</span><span class="n">C</span><span class="p">,</span> <span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="p">,</span> <span class="n">A</span><span class="o">]</span>
-</span><span class='line'><span class="o">[</span><span class="n">A</span><span class="o">::</span><span class="n">B</span><span class="o">]</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>大家有没有注意到，<code>module A::B</code> 这种快捷写法会导致 <code>A</code> 不在 <code>Module.nesting</code> 里，这就是上述第二个问题的根源，因为 M 是 A module 下的常量，<code>module A::B</code> 写法导致不会查找 <code>A::M</code>。</p>
-
-<p>说完 <code>A Module.nesting</code>，再说一下 <code>B open class/module 的 ancestors</code>，这个问题相对复杂很多。简单的说，在 Ruby 代码的任何位置，都有一个 <code>self</code> 存在，同样也有一个 <code>open class/module</code> 存在，在模块和类定义处，它通常就是对应的模块和类，在方法内部，它是方法对应的类。对于 ancestors，我们可以通过代码位置 <code>open class/module</code> 的 ancestors 方法取得。</p>
-
-<p>（备注：ancestors 在引入 singleton_class 概念之后变得有点复杂，如不清楚可参考《Ruby 元编程》）</p>
-
-<p>上述第一个问题：
-在method1 中
-A 是 <code>[C1]</code>
-<code>open class/module</code> 是 <code>C1</code>，所以 ancestors 是 <code>[C1, M1, Object, Kernel, BasicObject]</code>
-CK 在 A 可以找到，CT 在 B 可以找到。</p>
-
-<p>method2 中
-A 是 <code>[C1]</code>
-<code>open class/module</code> 是 <strong>C1 的 singleton_class</strong> , 所以 ancestors 是 <code>[Class, Module, Object, Kernel, BasicObject]</code>
-CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
-
-<p>对于</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">M1</span>
-</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">included</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
-</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">self</span><span class="p">)</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>  <span class="no">CT</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>可运行，是因为这时，在 method2 中，<code>open class/module</code> <strong>C1 的 singleton_class</strong> 扩展了 M1，所以 ancestors 变成了
-<code>[M1, Class, Module, Object, Kernel, BasicObject]</code>。</p>
-
-<p>至此，这两个困扰我多时的问题终于彻底搞清楚了。这个过程给我的一个体会是：面对技术上的一些疑问，如果只是浅尝辄止，是永远不能够真正掌握它的，只有深入专研，透彻理解它的原理，才能够真正掌握它，获得真正的能力提升。</p>
-
-<p>文章提到的 blog 网址：
-<a href="http://http://cirw.in/blog/constant-lookup">Everything you ever wanted to know about constant lookup in Ruby</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -2201,6 +1965,10 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
       </li>
     
@@ -2214,10 +1982,6 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
     
       <li class="post">
         <a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
       </li>
     
   </ul>

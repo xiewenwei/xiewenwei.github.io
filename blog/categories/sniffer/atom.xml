@@ -4,7 +4,7 @@
   <title><![CDATA[Category: sniffer | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/sniffer/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-10-27T00:07:31+08:00</updated>
+  <updated>2014-11-16T23:28:57+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -20,7 +20,7 @@
     <id>http://xiewenwei.github.com//blog/2014/10/26/a-http-sniffer-tool-pproxy</id>
     <content type="html"><![CDATA[<h2>引言</h2>
 
-<p>  web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app 大流行的时代，想要观察 app 中得 http 请求的秘密，浏览器的工具和插件都无能为力，有不少本地化的软件可以很好的解决这个问题，Windows 平台下有大名鼎鼎的 Fiddler 和 HttpWatch，Mac 平台下有 Charles。Charles 是一个收费软件，价格不菲要 $50。钱还不是关键问题，作为一名 geek，当然想更向往开源，轻量的解决方案了，无意中发现 pproxy，简单使用了一下，觉得相当棒，可以做了绝佳的替代方案。</p>
+<p>  web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app 大流行的时代，想要观察 app 中得 http 请求的秘密，浏览器的工具和插件都无能为力，有不少本地化的软件可以很好的解决这个问题，Windows 平台下有大名鼎鼎的 Fiddler 和 HttpWatch，Mac 平台下有 Charles。Charles 是一个收费软件，价格不菲要 $50。钱还不是关键问题，作为一名 geek，当然想更向往开源，轻量的解决方案了，无意中发现 pproxy，简单使用了一下，觉得相当棒，可以做绝佳的替代方案。</p>
 
 <h2>比较</h2>
 

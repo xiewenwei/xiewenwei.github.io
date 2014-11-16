@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="引言 web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app &hellip;">
+  <meta name="description" content="Rails 应用程序中操作冲突是一个常见问题，Rails 提供了简单有效的解决方法。 举一个实际的例子：我们的系统里有一个商店模块，商店中重要的一块是对产品信息的管理，比如运营人员常常会编辑产品的信息，包括产品标题，营销口号和价格等等。因为修改十分频繁，碰巧同时编辑提交修改的话， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,6 +74,76 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-11-16T22:51:00+08:00" pubdate data-updated="true">2014-11-16</time>
+        
+         | <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Rails 应用程序中操作冲突是一个常见问题，Rails 提供了简单有效的解决方法。</p>
+
+<p>举一个实际的例子：我们的系统里有一个商店模块，商店中重要的一块是对产品信息的管理，比如运营人员常常会编辑产品的信息，包括产品标题，营销口号和价格等等。因为修改十分频繁，碰巧同时编辑提交修改的话，就会偶尔遇到修改丢失的问题，运营人员 A 修改产品标题，运营人员 B 修改价格，A 和 B 提交修改都提示修改成功，但是结果上只是 A 的修改结果生效，B 的修改被 A 的修改冲掉了。</p>
+
+<p>仔细研究原因，发现是因为修改功能缺少操作冲突机制，而修改操作同时发生导致了问题。
+如下图所示，A 和 B 同时从数据库中查询数据，在 web 页面中修改同样的数据，提交保存时是以 web 页面中提交的数据为准，从而导致 A 的修改把 B 的修改给覆盖了。</p>
+
+<p><img src="/images/house/rails_conflict.png" alt="A和B修改冲突" /></p>
+
+<p>Rails 的 乐观锁<a href="http://api.rubyonrails.org/classes/ActiveRecord/Locking/Optimistic.html">Optimistic Locking</a> 是解决这个问题的有力工具，它的原理是在数据库表中增加一个字段（默认是 lock_version，可配置）记录数据的版本号，每个提交的修改都带上这个版本号，在真正 update 修改数据之前，先判断提交的 lock_version 数据和数据库中的是否一致，如果不一致，则认为发生数据冲突，将抛出 <code>ActiveRecord::StaleObjectError</code> 异常，这样程序就可以捕获这个异常，提醒用户发生了冲突，由用户去协调解决冲突。</p>
+
+<p>相关示例代码如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># migration: add lock_version to products</span>
+</span><span class='line'><span class="n">add_column</span> <span class="ss">:products</span><span class="p">,</span> <span class="ss">:lock_version</span><span class="p">,</span> <span class="ss">:integer</span><span class="p">,</span> <span class="n">defalut</span><span class="p">:</span> <span class="mi">0</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># update product with StaleObjectError checking</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">product</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">params</span><span class="o">[</span><span class="ss">:product</span><span class="o">]</span><span class="p">)</span>
+</span><span class='line'><span class="k">rescue</span> <span class="no">ActiveRecord</span><span class="o">::</span><span class="no">StaleObjectError</span>
+</span><span class='line'>  <span class="n">render</span> <span class="s1">&#39;confilct&#39;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a></h1>
     
     
@@ -101,7 +171,7 @@
 
   <div class="entry-content"><h2>引言</h2>
 
-<p>  web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app 大流行的时代，想要观察 app 中得 http 请求的秘密，浏览器的工具和插件都无能为力，有不少本地化的软件可以很好的解决这个问题，Windows 平台下有大名鼎鼎的 Fiddler 和 HttpWatch，Mac 平台下有 Charles。Charles 是一个收费软件，价格不菲要 $50。钱还不是关键问题，作为一名 geek，当然想更向往开源，轻量的解决方案了，无意中发现 pproxy，简单使用了一下，觉得相当棒，可以做了绝佳的替代方案。</p>
+<p>  web 开发和 API 开发中难免要详细分析 http 请求和响应信息。web 开发的话，浏览器提供了便利的工具，比如 chrome 和 IE 都带了 develop tool，而 firefox 更是有十分强大的 firebug，可以让 http 请求的所有秘密一览无遗。目前是 app 大流行的时代，想要观察 app 中得 http 请求的秘密，浏览器的工具和插件都无能为力，有不少本地化的软件可以很好的解决这个问题，Windows 平台下有大名鼎鼎的 Fiddler 和 HttpWatch，Mac 平台下有 Charles。Charles 是一个收费软件，价格不菲要 $50。钱还不是关键问题，作为一名 geek，当然想更向往开源，轻量的解决方案了，无意中发现 pproxy，简单使用了一下，觉得相当棒，可以做绝佳的替代方案。</p>
 
 <h2>比较</h2>
 
@@ -909,52 +979,6 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/06/16/redis-data-protection/">保护 Redis 的数据</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-16T00:08:00+08:00" pubdate data-updated="true">2014-06-16</time>
-        
-         | <a href="/blog/2014/06/16/redis-data-protection/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Redis 是非常流行的 key-value 类型的 NOSQL 数据库，它的 value 数据类型丰富多样，适合解决很多对关系数据库来说棘手的问题。Redis 是内存数据库，也就是说它把所有的数据都放在内存中。众所周知，当前机器突然断电或者系统异常崩溃时，内存的数据会丢失的，所以如果把系统的关键数据放在 Redis 中必须做好保护措施。</p>
-
-<p>Redis 提供了两种持久化数据机制：</p>
-
-<p>一种是 RDB 机制。这种方式是把当前整个 Redis 内存数据快照写到磁盘上。优点是比较简单，恢复快速。缺点是代价比较昂贵，尤其当数据量很大时，会严重影响到 Redis（照成 Redis 停顿），而且会极度消耗磁盘 IO。</p>
-
-<p>另一种是 AppendOnly 机制。这种方式类似于 log，把数据操作命令全部存入 log 文件。优点是每段时间写入数据不是很大，可以设置很短的写入时间间隔（比如1秒钟）。缺点是 log 文件可能会远大于数据文件，通常会是数据文件大小的 3~5 倍，而且恢复的时间要远大于 RDB 方式的恢复时间。</p>
-
-<p>这两种机制各有优劣，不过它们是可以结合起来使用的。在实际使用过程，通常还结合 Redis 的 slave 功能，做到对 Redis 影响更小，保护更充分。具体的做法是对 Redis 建立 master 和 slave，在 master 上根本不使用任何持久化机制，只在 slave 上建立结合 RDB 和 AppendOnly 的持久化机制。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -970,6 +994,10 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
       </li>
     
@@ -983,10 +1011,6 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
     
       <li class="post">
         <a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/07/13/capistrano-to-servers-behind-gateway/">使用 capistrano 部署到内部服务器</a>
       </li>
     
   </ul>

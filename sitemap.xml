@@ -118,7 +118,13 @@
     </url>
     <url>
         <loc>http://xiewenwei.github.com//blog/2014/10/26/a-http-sniffer-tool-pproxy/</loc>
-        <lastmod>2014-10-27T00:06:28+08:00</lastmod>
+        <lastmod>2014-10-27T09:09:25+08:00</lastmod>
+    </url>
+    <url>
+        <loc>
+            http://xiewenwei.github.com//blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/
+        </loc>
+        <lastmod>2014-11-16T23:28:28+08:00</lastmod>
     </url>
     <url>
         <loc>http://xiewenwei.github.com//about-me/</loc>
@@ -132,10 +138,10 @@
     </url>
     <url>
         <loc>http://xiewenwei.github.com//blog/archives/</loc>
-        <lastmod>2014-10-27T00:06:28+08:00</lastmod>
+        <lastmod>2014-11-16T23:28:28+08:00</lastmod>
     </url>
     <url>
         <loc>http://xiewenwei.github.com//</loc>
-        <lastmod>2014-10-27T00:06:28+08:00</lastmod>
+        <lastmod>2014-11-16T23:28:28+08:00</lastmod>
     </url>
 </urlset>
