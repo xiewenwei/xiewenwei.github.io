@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: mysql | 程序人生]]></title>
+  <link href="http://xiewenwei.github.com//blog/categories/mysql/atom.xml" rel="self"/>
+  <link href="http://xiewenwei.github.com//"/>
+  <updated>2014-12-14T22:52:14+08:00</updated>
+  <id>http://xiewenwei.github.com//</id>
+  <author>
+    <name><![CDATA[vincent]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Rails 中 MySQL 分区表使用的一个注意事项]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/12/14/mysql-partition-table-in-rails/"/>
+    <updated>2014-12-14T22:46:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/12/14/mysql-partition-table-in-rails</id>
+    <content type="html"><![CDATA[<p>MySQL 的分区表是一种简单有效的处理极大数据表的特性，通过它可以使应用程序几乎很少改动就能达成对极大数据表的高效处理，但由于 Rails ActiveRecord 设计上一些惯例，可能导致一些数据处理不能利用分区表特性，反而变得很慢，在使用分区表过程中一定要多加注意。</p>
+
+<p>下面以一个例子来说明。在 light 系统中，有一张数据表是 diet_items, 主要字段是 id, schedule_id, meal_order food_id, weight, calory 等等，它的每一条记录表示为用户生成每日的减肥计划（减肥食谱 + 运动计划）中的一条饮食项，平均一条的计划有 10 多条数据，数据量非常大，预计每天生成数据会超过 100 万条，所以对其做了分表处理，根据 schedule_id hash 分成 60 张表，也就是数据将动态分到 60 张表中。分表后 diet_items 的建表语句如下所示：</p>
+
+<p><code>sql
+CREATE TABLE `diet_items` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `schedule_id` int(11) NOT NULL,
+  `meals_order` int(11) NOT NULL,
+  `food_id` int(11) DEFAULT NULL,
+  ....
+  KEY id (`id`),
+  UNIQUE KEY `index_diet_items_on_schedule_id_and_id` (`schedule_id`,`id`)
+)
+PARTITION BY HASH (schedule_id)
+PARTITIONS 60;
+</code>
+分表之后，所有查询 diet_items 的地方都要求带上 schedule_id，比如获取某一个 schedule 的所有 diet_items，通过 schedule. diet_items，获取某一个 id 的 diet_item 也是通过  <code>schedule.diet_items.find(id)</code> 进行。生成 diet_item 也没有问题，因为生成 diet_item 都是通过 <code>schedule.diet_items.build(data)</code> 方式，在生成的时候都是带了 schedule_id 的。</p>
+
+<p>观察 newrelic 日志，发现 diet_item 的 update 和 destroy 相关的请求特别慢，仔细分析后，发现这两种操作非常忙是由于 ActiveRecord 生成的 sql 并没有带 schedule_id 导致。
+diet_item update 操作 ActiveRecord 生成的 sql 语句类似于 <code>update diet_items set … where id = &lt;id&gt;</code>。
+diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &lt;id&gt;</code>
+因为没有带 schedule_id，导致这两种语句都需要 mysql 扫描 60 张分区表才能够完成一个语句执行，非常慢！</p>
+
+<p>知道原因之后就好办了，把原来的 update 和 destroy 调用改为自定义版本的 update 和 destroy 调用就可以了。</p>
+
+<ul>
+<li><p><code>diet_item.update(attributes)</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).update_all(attributes)</code></p></li>
+<li><p><code>diet_item.destroy</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).delete_all</code></p></li>
+</ul>
+
+
+<p>这样生成的 sql 都带上 schedule_id 条件，从而避免了扫描全部的分区表，性能提升立竿见影。</p>
+]]></content>
+  </entry>
+  
+</feed>

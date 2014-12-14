@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Ruby 的常量查找路径问题是一直困扰我的一个问题，在工作中遇到过好几次，一直没有彻底弄清楚到底为什么，最近在读一本书《Ruby 元编程》，对 Ruby 对象模型有了更深入的认识，另外读了一篇 blog《Everything you ever wanted to know about &hellip;">
+  <meta name="description" content="最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。 NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,120 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/12/16/refactor-nice-program/">重构 NICE 方案程序</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-12-16T22:42:00+08:00" pubdate data-updated="true">2012-12-16</time>
+        
+         | <a href="/blog/2012/12/16/refactor-nice-program/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。</p>
+
+<p>NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码，简单的说就是把生成工作分解成多个步骤，为每一个步骤定义一个方法，然后在一个主控方法中分别调用各个方法。这看起来是比较简单的，但是升级维护变得很困难，比如要增加一个新版本的方案生成方法，不得不在代码中很多地方加入 <code>if else</code> 判断。</p>
+
+<p>这次的工作就是要增加一个新版本的 NICE 方案生成方法，而且要求对之前的所有方案生成提供兼容。考虑再三，不打算在之前的代码上增加许多 <code>if else</code> 完成工作，于是对整个生成代码做一次大的重构。</p>
+
+<p>从工厂流水线的工作方式得到启发，感觉 NICE 的评测和方案生成就象是流水线作业。NICE 评测从输入到评测报告的过程，可以抽象为 input 经过一系列的 analyzer 的处理，最后得到一个 evaluation result的过程。而 NICE 方案可以抽象为，输入是 input 和评测报告，经过一系列 builder 的处理，最后得多一个 solution result.</p>
+
+<p>重构后，NICE 评测生成过程的核心类图如下：
+<img src="/images/house/analyzer.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">EvaluationResult</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="c1"># Order of analyzer must be restricted</span>
+</span><span class='line'>  <span class="o">[</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">BodyAnalyzer</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TagAnalyzer</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TipAnalyzer</span>
+</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">analyzer</span><span class="o">|</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># save result ...</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>评测分析过程基类是 Analyzer，BodyAnalyzer，TagAnalyzer 和 TipAnalyzer 都从它继承而来，每一个 Analyzer 完成一部分的评测分析工作。重构之后，扩展评测变得很容易，只要增加一种特定的 Analyzer 即可，而且这个 Analyzer 完全可以从之前的 Analyzer 继承已达到代码复用。</p>
+
+<p>重构后，NICE 方案生成过程的核心类图如下：
+<img src="/images/house/builder.png" alt="Analyzer" /></p>
+
+<p>重构后，NICE 评测的主控过程代码：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">SolutionResult</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>  <span class="n">input_wrapper</span> <span class="o">=</span> <span class="no">Solution</span><span class="o">::</span><span class="no">InputWrapper</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">)</span>
+</span><span class='line'>  <span class="c1"># Order of builder must be restricted</span>
+</span><span class='line'>  <span class="o">[</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">PreparingBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">WeekPlanBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">EatTipBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActivityPlanBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActTipBuilder</span><span class="p">,</span>
+</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">NoticeBuilder</span>
+</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">builder</span><span class="o">|</span>
+</span><span class='line'>    <span class="n">builder</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input_wrapper</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">build</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># save result ...</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>方案生成过程基类是 Builder，PreparingBuilder，WeekPlanBuilder 和 NoticeBuilder 都从它继承而来，每一个 Builder 完成一部分的方案生成工作。</p>
+
+<p>流水线作业的设计模式很适合象 NICE 方案生成的工作，它的特点是：整体过程复杂，可以分解为多个类似的步骤，这些步骤共享相同的输入和输出对象。使用这种设计模式后，代码结果变成简单清晰，而且易于扩展维护。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1238,6 +1352,10 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
       </li>
     
@@ -1251,10 +1369,6 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
     
       <li class="post">
         <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a>
       </li>
     
   </ul>

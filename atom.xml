@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-11-16T23:28:57+08:00</updated>
+  <updated>2014-12-14T22:52:14+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -12,6 +12,59 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Rails 中 MySQL 分区表使用的一个注意事项]]></title>
+    <link href="http://xiewenwei.github.com//blog/2014/12/14/mysql-partition-table-in-rails/"/>
+    <updated>2014-12-14T22:46:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2014/12/14/mysql-partition-table-in-rails</id>
+    <content type="html"><![CDATA[<p>MySQL 的分区表是一种简单有效的处理极大数据表的特性，通过它可以使应用程序几乎很少改动就能达成对极大数据表的高效处理，但由于 Rails ActiveRecord 设计上一些惯例，可能导致一些数据处理不能利用分区表特性，反而变得很慢，在使用分区表过程中一定要多加注意。</p>
+
+<p>下面以一个例子来说明。在 light 系统中，有一张数据表是 diet_items, 主要字段是 id, schedule_id, meal_order food_id, weight, calory 等等，它的每一条记录表示为用户生成每日的减肥计划（减肥食谱 + 运动计划）中的一条饮食项，平均一条的计划有 10 多条数据，数据量非常大，预计每天生成数据会超过 100 万条，所以对其做了分表处理，根据 schedule_id hash 分成 60 张表，也就是数据将动态分到 60 张表中。分表后 diet_items 的建表语句如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='sql'><span class='line'><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="o">`</span><span class="n">diet_items</span><span class="o">`</span> <span class="p">(</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span> <span class="n">AUTO_INCREMENT</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">schedule_id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">meals_order</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">food_id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">DEFAULT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="p">....</span>
+</span><span class='line'>  <span class="k">KEY</span> <span class="n">id</span> <span class="p">(</span><span class="o">`</span><span class="n">id</span><span class="o">`</span><span class="p">),</span>
+</span><span class='line'>  <span class="k">UNIQUE</span> <span class="k">KEY</span> <span class="o">`</span><span class="n">index_diet_items_on_schedule_id_and_id</span><span class="o">`</span> <span class="p">(</span><span class="o">`</span><span class="n">schedule_id</span><span class="o">`</span><span class="p">,</span><span class="o">`</span><span class="n">id</span><span class="o">`</span><span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span><span class='line'><span class="n">PARTITION</span> <span class="k">BY</span> <span class="n">HASH</span> <span class="p">(</span><span class="n">schedule_id</span><span class="p">)</span>
+</span><span class='line'><span class="n">PARTITIONS</span> <span class="mi">60</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>分表之后，所有查询 diet_items 的地方都要求带上 schedule_id，比如获取某一个 schedule 的所有 diet_items，通过 schedule. diet_items，获取某一个 id 的 diet_item 也是通过  <code>schedule.diet_items.find(id)</code> 进行。生成 diet_item 也没有问题，因为生成 diet_item 都是通过 <code>schedule.diet_items.build(data)</code> 方式，在生成的时候都是带了 schedule_id 的。</p>
+
+<p>观察 newrelic 日志，发现 diet_item 的 update 和 destroy 相关的请求特别慢，仔细分析后，发现这两种操作非常忙是由于 ActiveRecord 生成的 sql 并没有带 schedule_id 导致。
+diet_item update 操作 ActiveRecord 生成的 sql 语句类似于 <code>update diet_items set … where id = &lt;id&gt;</code>。
+diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &lt;id&gt;</code>
+因为没有带 schedule_id，导致这两种语句都需要 mysql 扫描 60 张分区表才能够完成一个语句执行，非常慢！</p>
+
+<p>知道原因之后就好办了，把原来的 update 和 destroy 调用改为自定义版本的 update 和 destroy 调用就可以了。</p>
+
+<ul>
+<li><p><code>diet_item.update(attributes)</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).update_all(attributes)</code></p></li>
+<li><p><code>diet_item.destroy</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).delete_all</code></p></li>
+</ul>
+
+
+<p>这样生成的 sql 都带上 schedule_id 条件，从而避免了扫描全部的分区表，性能提升立竿见影。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[如何解决 Rails 中同时修改冲突]]></title>
@@ -2134,91 +2187,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 <p>Ruby 1.9.3 中，YAML 引擎 由 Syck 改成了 Psych，Psych 和 Syck 在处理 UTF-8 字符串时有明显的区别，详见 <a href="http://galeki.is-programmer.com/posts/32636">Psych、Syck、YAML 和编码</a></p>
 
 <p>总结：把 Ruby 从 1.8 升级到 1.9 还是比较轻松的，遇到的问题比想象中少，而且解决起来都不算麻烦。Ruby 兼容性方法做得很棒，赞一个。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[重构 NICE 方案程序]]></title>
-    <link href="http://xiewenwei.github.com//blog/2012/12/16/refactor-nice-program/"/>
-    <updated>2012-12-16T22:42:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2012/12/16/refactor-nice-program</id>
-    <content type="html"><![CDATA[<p>最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。</p>
-
-<p>NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码，简单的说就是把生成工作分解成多个步骤，为每一个步骤定义一个方法，然后在一个主控方法中分别调用各个方法。这看起来是比较简单的，但是升级维护变得很困难，比如要增加一个新版本的方案生成方法，不得不在代码中很多地方加入 <code>if else</code> 判断。</p>
-
-<p>这次的工作就是要增加一个新版本的 NICE 方案生成方法，而且要求对之前的所有方案生成提供兼容。考虑再三，不打算在之前的代码上增加许多 <code>if else</code> 完成工作，于是对整个生成代码做一次大的重构。</p>
-
-<p>从工厂流水线的工作方式得到启发，感觉 NICE 的评测和方案生成就象是流水线作业。NICE 评测从输入到评测报告的过程，可以抽象为 input 经过一系列的 analyzer 的处理，最后得到一个 evaluation result的过程。而 NICE 方案可以抽象为，输入是 input 和评测报告，经过一系列 builder 的处理，最后得多一个 solution result.</p>
-
-<p>重构后，NICE 评测生成过程的核心类图如下：
-<img src="http://xiewenwei.github.com//images/house/analyzer.png" alt="Analyzer" /></p>
-
-<p>重构后，NICE 评测的主控过程代码：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">EvaluationResult</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>  <span class="c1"># Order of analyzer must be restricted</span>
-</span><span class='line'>  <span class="o">[</span>
-</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">BodyAnalyzer</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TagAnalyzer</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TipAnalyzer</span>
-</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">analyzer</span><span class="o">|</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span> <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1"># save result ...</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>评测分析过程基类是 Analyzer，BodyAnalyzer，TagAnalyzer 和 TipAnalyzer 都从它继承而来，每一个 Analyzer 完成一部分的评测分析工作。重构之后，扩展评测变得很容易，只要增加一种特定的 Analyzer 即可，而且这个 Analyzer 完全可以从之前的 Analyzer 继承已达到代码复用。</p>
-
-<p>重构后，NICE 方案生成过程的核心类图如下：
-<img src="http://xiewenwei.github.com//images/house/builder.png" alt="Analyzer" /></p>
-
-<p>重构后，NICE 评测的主控过程代码：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">SolutionResult</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>  <span class="n">input_wrapper</span> <span class="o">=</span> <span class="no">Solution</span><span class="o">::</span><span class="no">InputWrapper</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">)</span>
-</span><span class='line'>  <span class="c1"># Order of builder must be restricted</span>
-</span><span class='line'>  <span class="o">[</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">PreparingBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">WeekPlanBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">EatTipBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActivityPlanBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActTipBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">NoticeBuilder</span>
-</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">builder</span><span class="o">|</span>
-</span><span class='line'>    <span class="n">builder</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input_wrapper</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">build</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1"># save result ...</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>方案生成过程基类是 Builder，PreparingBuilder，WeekPlanBuilder 和 NoticeBuilder 都从它继承而来，每一个 Builder 完成一部分的方案生成工作。</p>
-
-<p>流水线作业的设计模式很适合象 NICE 方案生成的工作，它的特点是：整体过程复杂，可以分解为多个类似的步骤，这些步骤共享相同的输入和输出对象。使用这种设计模式后，代码结果变成简单清晰，而且易于扩展维护。</p>
 ]]></content>
   </entry>
   

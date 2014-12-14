@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Rails 应用程序中操作冲突是一个常见问题，Rails 提供了简单有效的解决方法。 举一个实际的例子：我们的系统里有一个商店模块，商店中重要的一块是对产品信息的管理，比如运营人员常常会编辑产品的信息，包括产品标题，营销口号和价格等等。因为修改十分频繁，碰巧同时编辑提交修改的话， &hellip;">
+  <meta name="description" content="MySQL 的分区表是一种简单有效的处理极大数据表的特性，通过它可以使应用程序几乎很少改动就能达成对极大数据表的高效处理，但由于 Rails ActiveRecord 设计上一些惯例，可能导致一些数据处理不能利用分区表特性，反而变得很慢，在使用分区表过程中一定要多加注意。 下面以一个例子来说明。在 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,88 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-12-14T22:46:00+08:00" pubdate data-updated="true">2014-12-14</time>
+        
+         | <a href="/blog/2014/12/14/mysql-partition-table-in-rails/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>MySQL 的分区表是一种简单有效的处理极大数据表的特性，通过它可以使应用程序几乎很少改动就能达成对极大数据表的高效处理，但由于 Rails ActiveRecord 设计上一些惯例，可能导致一些数据处理不能利用分区表特性，反而变得很慢，在使用分区表过程中一定要多加注意。</p>
+
+<p>下面以一个例子来说明。在 light 系统中，有一张数据表是 diet_items, 主要字段是 id, schedule_id, meal_order food_id, weight, calory 等等，它的每一条记录表示为用户生成每日的减肥计划（减肥食谱 + 运动计划）中的一条饮食项，平均一条的计划有 10 多条数据，数据量非常大，预计每天生成数据会超过 100 万条，所以对其做了分表处理，根据 schedule_id hash 分成 60 张表，也就是数据将动态分到 60 张表中。分表后 diet_items 的建表语句如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='sql'><span class='line'><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="o">`</span><span class="n">diet_items</span><span class="o">`</span> <span class="p">(</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span> <span class="n">AUTO_INCREMENT</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">schedule_id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">meals_order</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">food_id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">DEFAULT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="p">....</span>
+</span><span class='line'>  <span class="k">KEY</span> <span class="n">id</span> <span class="p">(</span><span class="o">`</span><span class="n">id</span><span class="o">`</span><span class="p">),</span>
+</span><span class='line'>  <span class="k">UNIQUE</span> <span class="k">KEY</span> <span class="o">`</span><span class="n">index_diet_items_on_schedule_id_and_id</span><span class="o">`</span> <span class="p">(</span><span class="o">`</span><span class="n">schedule_id</span><span class="o">`</span><span class="p">,</span><span class="o">`</span><span class="n">id</span><span class="o">`</span><span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span><span class='line'><span class="n">PARTITION</span> <span class="k">BY</span> <span class="n">HASH</span> <span class="p">(</span><span class="n">schedule_id</span><span class="p">)</span>
+</span><span class='line'><span class="n">PARTITIONS</span> <span class="mi">60</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>分表之后，所有查询 diet_items 的地方都要求带上 schedule_id，比如获取某一个 schedule 的所有 diet_items，通过 schedule. diet_items，获取某一个 id 的 diet_item 也是通过  <code>schedule.diet_items.find(id)</code> 进行。生成 diet_item 也没有问题，因为生成 diet_item 都是通过 <code>schedule.diet_items.build(data)</code> 方式，在生成的时候都是带了 schedule_id 的。</p>
+
+<p>观察 newrelic 日志，发现 diet_item 的 update 和 destroy 相关的请求特别慢，仔细分析后，发现这两种操作非常忙是由于 ActiveRecord 生成的 sql 并没有带 schedule_id 导致。
+diet_item update 操作 ActiveRecord 生成的 sql 语句类似于 <code>update diet_items set … where id = &lt;id&gt;</code>。
+diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &lt;id&gt;</code>
+因为没有带 schedule_id，导致这两种语句都需要 mysql 扫描 60 张分区表才能够完成一个语句执行，非常慢！</p>
+
+<p>知道原因之后就好办了，把原来的 update 和 destroy 调用改为自定义版本的 update 和 destroy 调用就可以了。</p>
+
+<ul>
+<li><p><code>diet_item.update(attributes)</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).update_all(attributes)</code></p></li>
+<li><p><code>diet_item.destroy</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).delete_all</code></p></li>
+</ul>
+
+
+<p>这样生成的 sql 都带上 schedule_id 条件，从而避免了扫描全部的分区表，性能提升立竿见影。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -823,162 +905,6 @@ capistrano 3.x 设置如下：</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-22T22:48:00+08:00" pubdate data-updated="true">2014-06-22</time>
-        
-         | <a href="/blog/2014/06/22/trap-in-mongodb/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。特别申明：我们目前用的 MongoDB 版本是 2.4.10，曾经升级到 MongoDB 2.6.0 版本，问题依然存在，又回退到 2.4.10 版本。</p>
-
-<h2>MongoDB 数据库级锁</h2>
-
-<p><strong><em>坑爹指数：5星（最高5星）</em></strong></p>
-
-<p>MongoDB的锁机制和一般关系数据库如 MySQL（InnoDB）, Oracle 有很大的差异，InnoDB 和 Oracle 能提供行级粒度锁，而 MongoDB 只能提供 <strong><em>库级粒度锁</em></strong>，这意味着当 MongoDB 一个写锁处于占用状态时，其它的读写操作都得干等。</p>
-
-<p>初看起来库级锁在大并发环境下有严重的问题，但是 MongoDB 依然能够保持大并发量和高性能，这是因为 MongoDB 的锁粒度虽然很粗放，但是在锁处理机制和关系数据库锁有很大差异，主要表现在：</p>
-
-<ul>
-<li>MongoDB 没有完整事务支持，操作原子性只到单个 document 级别，所以通常操作粒度比较小；</li>
-<li>MongoDB 锁实际占用时间是内存数据计算和变更时间，通常很快；</li>
-<li>MongoDB 锁有一种临时放弃机制，当出现需要等待慢速 IO 读写数据时，可以先临时放弃，等 IO 完成之后再重新获取锁。</li>
-</ul>
-
-
-<p>通常不出问题不等于没有问题，如果数据操作不当，依然会导致长时间占用写锁，比如下面提到的前台建索引操作，当出现这种情况的时候，整个数据库就处于完全阻塞状态，无法进行任何读写操作，情况十分严重。</p>
-
-<p>解决问题的方法，尽量避免长时间占用写锁操作，如果有一些集合操作实在难以避免，可以考虑把这个集合放到一个单独的 MongoDB 库里，因为 MongoDB 不同库锁是相互隔离的，分离集合可以避免某一个集合操作引发全局阻塞问题。</p>
-
-<h2>建索引导致数据库阻塞</h2>
-
-<p><strong><em>坑爹指数：3星</em></strong></p>
-
-<p>上面提到了 MongoDB 库级锁的问题，建索引就是一个容易引起长时间写锁的问题，MongoDB 在前台建索引时需要占用一个写锁（而且不会临时放弃），如果集合的数据量很大，建索引通常要花比较长时间，特别容易引起问题。</p>
-
-<p>解决的方法很简单，MongoDB 提供了两种建索引的访问，一种是 background 方式，不需要长时间占用写锁，另一种是非 background 方式，需要长时间占用锁。使用 background 方式就可以解决问题。
-例如，为超大表 posts 建立索引，
-<strong><em>千万不用使用</em></strong></p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='javascript'><span class='line'><span class="nx">db</span><span class="p">.</span><span class="nx">posts</span><span class="p">.</span><span class="nx">ensureIndex</span><span class="p">({</span><span class="nx">user_id</span><span class="o">:</span> <span class="mi">1</span><span class="p">})</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p><strong><em>而应该使用</em></strong></p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='javascript'><span class='line'><span class="nx">db</span><span class="p">.</span><span class="nx">posts</span><span class="p">.</span><span class="nx">ensureIndex</span><span class="p">({</span><span class="nx">user_id</span><span class="o">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="nx">background</span><span class="o">:</span> <span class="mi">1</span><span class="p">})</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<h2>不合理使用嵌入 embed document</h2>
-
-<p><strong><em>坑爹指数：5星</em></strong></p>
-
-<p>embed document 是 MongoDB 相比关系数据库差异明显的一个地方，可以在某一个 document 中嵌入其它子 document，这样可以在父子 document 保持在单一 collection 中，检索修改比较方便。</p>
-
-<p>比如薄荷的应用情景中有一个 Group document，用户申请加入 Group 建模为 GroupRequest document，我们最初的时候使用 embed 方式把 GroupRequest 放置到 Group 中。
-Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">Group</span>
-</span><span class='line'>  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
-</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
-</span><span class='line'>  <span class="n">embeds_many</span> <span class="ss">:group_requests</span>
-</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">class</span> <span class="nc">GroupRequest</span>
-</span><span class='line'>  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
-</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
-</span><span class='line'>  <span class="n">embedded_in</span> <span class="ss">:group</span>
-</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这个使用方式让我们掉到坑里了，差点就爬不出来，它导致有接近两周的时间系统问题，高峰时段常有几分钟的系统卡顿，最严重一次甚至引起 MongoDB 宕机。</p>
-
-<p>仔细分析后，发现某些活跃的 Group 的 group_requests 增加（当有新申请时）和更改（当通过或拒绝用户申请时）异常频繁，而这些操作经常长时间占用写锁，导致整个数据库阻塞。原因是当有增加 group_request 操作时，Group 预分配的空间不够，需要重新分配空间（内存和硬盘都需要），耗时较长，另外 Group 上建的索引很多，移动 Group 位置导致大量索引更新操作也很耗时，综合起来引起了长时间占用锁问题。</p>
-
-<p>解决问题的方法，说起来也简单，就是把 embed 关联更改成的普通外键关联，就是类似关系数据库的做法，这样 group_request 增加或修改都只发生在 GroupRequest 上，简单快速，避免长时间占用写锁问题。当关联对象的数据不固定或者经常发生变化时，一定要避免使用 embed 关联，不然会死的很惨。</p>
-
-<h2>不合理使用 Array 字段</h2>
-
-<p><strong><em>坑爹指数：4星</em></strong></p>
-
-<p>MongoDB 的 Array 字段是比较独特的一个特性，它可以在单个 document 里存储一些简单的一对多关系。</p>
-
-<p>薄荷有一个应用情景使用遇到严重的性能问题，直接上代码如下所示：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">User</span>
-</span><span class='line'>  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
-</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
-</span><span class='line'>  <span class="n">field</span> <span class="ss">:follower_user_ids</span><span class="p">,</span> <span class="n">type</span><span class="p">:</span> <span class="nb">Array</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="o">[]</span>
-</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>User 中通过一个 Array 类型字段 follower_user_ids 保存用户关注的人的 id，用户关注的人从 10个到 3000 个不等，变化是比较频繁的，和上面 embed 引发的问题类似，频繁的 follower_user_ids 增加修改操作导致大量长时间数据库写锁，从而引发 MongoDB 数据库性能急剧下降。</p>
-
-<p>解决问题的方法：我们把 follower_user_ids 转移到了内存数据库 redis 中，避免了频繁更改 MongoDB 中的 User, 从而彻底解决问题。如果不使用 redis，也可以建立一个 UserFollower 集合，使用外键形式关联。</p>
-
-<p>先列举上面几个坑吧，都是害人不浅的陷阱，使用 MongoDB 过程一定要多加注意，避免掉到坑里。</p>
-
-<p>参考资料：
-  * 1.<a href="http://docs.mongodb.org/manual/faq/concurrency/">MongoDB 锁机制详解</a>
-  * 2.<a href="http://docs.mongodb.org/manual/tutorial/build-indexes-in-the-background/">MongoDB 建立索引操作文档</a></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -994,6 +920,10 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
       </li>
     
@@ -1007,10 +937,6 @@ Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
     
       <li class="post">
         <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a>
       </li>
     
   </ul>

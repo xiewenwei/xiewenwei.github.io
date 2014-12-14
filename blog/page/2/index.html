@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Redis 是非常流行的 key-value 类型的 NOSQL 数据库，它的 value 数据类型丰富多样，适合解决很多对关系数据库来说棘手的问题。Redis 是内存数据库，也就是说它把所有的数据都放在内存中。众所周知，当前机器突然断电或者系统异常崩溃时，内存的数据会丢失的， &hellip;">
+  <meta name="description" content="MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。特别申明： &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,162 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/06/22/trap-in-mongodb/">MongoDB 那些坑</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-22T22:48:00+08:00" pubdate data-updated="true">2014-06-22</time>
+        
+         | <a href="/blog/2014/06/22/trap-in-mongodb/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>MongoDB 是目前炙手可热的 NoSQL 文档型数据库，它提供的一些特性很棒：如自动 failover 机制，自动 sharding，无模式 schemaless，大部分情况下性能也很棒。但是薄荷在深入使用 MongoDB 过程中，遇到了不少问题，下面总结几个我们遇到的坑。特别申明：我们目前用的 MongoDB 版本是 2.4.10，曾经升级到 MongoDB 2.6.0 版本，问题依然存在，又回退到 2.4.10 版本。</p>
+
+<h2>MongoDB 数据库级锁</h2>
+
+<p><strong><em>坑爹指数：5星（最高5星）</em></strong></p>
+
+<p>MongoDB的锁机制和一般关系数据库如 MySQL（InnoDB）, Oracle 有很大的差异，InnoDB 和 Oracle 能提供行级粒度锁，而 MongoDB 只能提供 <strong><em>库级粒度锁</em></strong>，这意味着当 MongoDB 一个写锁处于占用状态时，其它的读写操作都得干等。</p>
+
+<p>初看起来库级锁在大并发环境下有严重的问题，但是 MongoDB 依然能够保持大并发量和高性能，这是因为 MongoDB 的锁粒度虽然很粗放，但是在锁处理机制和关系数据库锁有很大差异，主要表现在：</p>
+
+<ul>
+<li>MongoDB 没有完整事务支持，操作原子性只到单个 document 级别，所以通常操作粒度比较小；</li>
+<li>MongoDB 锁实际占用时间是内存数据计算和变更时间，通常很快；</li>
+<li>MongoDB 锁有一种临时放弃机制，当出现需要等待慢速 IO 读写数据时，可以先临时放弃，等 IO 完成之后再重新获取锁。</li>
+</ul>
+
+
+<p>通常不出问题不等于没有问题，如果数据操作不当，依然会导致长时间占用写锁，比如下面提到的前台建索引操作，当出现这种情况的时候，整个数据库就处于完全阻塞状态，无法进行任何读写操作，情况十分严重。</p>
+
+<p>解决问题的方法，尽量避免长时间占用写锁操作，如果有一些集合操作实在难以避免，可以考虑把这个集合放到一个单独的 MongoDB 库里，因为 MongoDB 不同库锁是相互隔离的，分离集合可以避免某一个集合操作引发全局阻塞问题。</p>
+
+<h2>建索引导致数据库阻塞</h2>
+
+<p><strong><em>坑爹指数：3星</em></strong></p>
+
+<p>上面提到了 MongoDB 库级锁的问题，建索引就是一个容易引起长时间写锁的问题，MongoDB 在前台建索引时需要占用一个写锁（而且不会临时放弃），如果集合的数据量很大，建索引通常要花比较长时间，特别容易引起问题。</p>
+
+<p>解决的方法很简单，MongoDB 提供了两种建索引的访问，一种是 background 方式，不需要长时间占用写锁，另一种是非 background 方式，需要长时间占用锁。使用 background 方式就可以解决问题。
+例如，为超大表 posts 建立索引，
+<strong><em>千万不用使用</em></strong></p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='javascript'><span class='line'><span class="nx">db</span><span class="p">.</span><span class="nx">posts</span><span class="p">.</span><span class="nx">ensureIndex</span><span class="p">({</span><span class="nx">user_id</span><span class="o">:</span> <span class="mi">1</span><span class="p">})</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><strong><em>而应该使用</em></strong></p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='javascript'><span class='line'><span class="nx">db</span><span class="p">.</span><span class="nx">posts</span><span class="p">.</span><span class="nx">ensureIndex</span><span class="p">({</span><span class="nx">user_id</span><span class="o">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="nx">background</span><span class="o">:</span> <span class="mi">1</span><span class="p">})</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>不合理使用嵌入 embed document</h2>
+
+<p><strong><em>坑爹指数：5星</em></strong></p>
+
+<p>embed document 是 MongoDB 相比关系数据库差异明显的一个地方，可以在某一个 document 中嵌入其它子 document，这样可以在父子 document 保持在单一 collection 中，检索修改比较方便。</p>
+
+<p>比如薄荷的应用情景中有一个 Group document，用户申请加入 Group 建模为 GroupRequest document，我们最初的时候使用 embed 方式把 GroupRequest 放置到 Group 中。
+Ruby 代码如下所示（使用了 Mongoid ORM）:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">Group</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'>  <span class="n">embeds_many</span> <span class="ss">:group_requests</span>
+</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">GroupRequest</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'>  <span class="n">embedded_in</span> <span class="ss">:group</span>
+</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这个使用方式让我们掉到坑里了，差点就爬不出来，它导致有接近两周的时间系统问题，高峰时段常有几分钟的系统卡顿，最严重一次甚至引起 MongoDB 宕机。</p>
+
+<p>仔细分析后，发现某些活跃的 Group 的 group_requests 增加（当有新申请时）和更改（当通过或拒绝用户申请时）异常频繁，而这些操作经常长时间占用写锁，导致整个数据库阻塞。原因是当有增加 group_request 操作时，Group 预分配的空间不够，需要重新分配空间（内存和硬盘都需要），耗时较长，另外 Group 上建的索引很多，移动 Group 位置导致大量索引更新操作也很耗时，综合起来引起了长时间占用锁问题。</p>
+
+<p>解决问题的方法，说起来也简单，就是把 embed 关联更改成的普通外键关联，就是类似关系数据库的做法，这样 group_request 增加或修改都只发生在 GroupRequest 上，简单快速，避免长时间占用写锁问题。当关联对象的数据不固定或者经常发生变化时，一定要避免使用 embed 关联，不然会死的很惨。</p>
+
+<h2>不合理使用 Array 字段</h2>
+
+<p><strong><em>坑爹指数：4星</em></strong></p>
+
+<p>MongoDB 的 Array 字段是比较独特的一个特性，它可以在单个 document 里存储一些简单的一对多关系。</p>
+
+<p>薄荷有一个应用情景使用遇到严重的性能问题，直接上代码如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">User</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">Mongoid</span><span class="o">::</span><span class="no">Document</span>
+</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'>  <span class="n">field</span> <span class="ss">:follower_user_ids</span><span class="p">,</span> <span class="n">type</span><span class="p">:</span> <span class="nb">Array</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="o">[]</span>
+</span><span class='line'>  <span class="o">.</span><span class="n">.</span><span class="o">.</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>User 中通过一个 Array 类型字段 follower_user_ids 保存用户关注的人的 id，用户关注的人从 10个到 3000 个不等，变化是比较频繁的，和上面 embed 引发的问题类似，频繁的 follower_user_ids 增加修改操作导致大量长时间数据库写锁，从而引发 MongoDB 数据库性能急剧下降。</p>
+
+<p>解决问题的方法：我们把 follower_user_ids 转移到了内存数据库 redis 中，避免了频繁更改 MongoDB 中的 User, 从而彻底解决问题。如果不使用 redis，也可以建立一个 UserFollower 集合，使用外键形式关联。</p>
+
+<p>先列举上面几个坑吧，都是害人不浅的陷阱，使用 MongoDB 过程一定要多加注意，避免掉到坑里。</p>
+
+<p>参考资料：
+  * 1.<a href="http://docs.mongodb.org/manual/faq/concurrency/">MongoDB 锁机制详解</a>
+  * 2.<a href="http://docs.mongodb.org/manual/tutorial/build-indexes-in-the-background/">MongoDB 建立索引操作文档</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1834,120 +1990,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/12/16/refactor-nice-program/">重构 NICE 方案程序</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-12-16T22:42:00+08:00" pubdate data-updated="true">2012-12-16</time>
-        
-         | <a href="/blog/2012/12/16/refactor-nice-program/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>最近的工作需要对原有的 NICE 方案生成程序做重构，应用了流水线作业设计模式，让整个 NICE 方案生成代码变得结构清晰，而且易于扩展。</p>
-
-<p>NICE 方案生成程序比较复杂，整体上分成两大步骤：一，根据用户的输入生成评测报告，二，根据用户输入和评测报告构建方案。以前的代码是非常典型的过程式的代码，简单的说就是把生成工作分解成多个步骤，为每一个步骤定义一个方法，然后在一个主控方法中分别调用各个方法。这看起来是比较简单的，但是升级维护变得很困难，比如要增加一个新版本的方案生成方法，不得不在代码中很多地方加入 <code>if else</code> 判断。</p>
-
-<p>这次的工作就是要增加一个新版本的 NICE 方案生成方法，而且要求对之前的所有方案生成提供兼容。考虑再三，不打算在之前的代码上增加许多 <code>if else</code> 完成工作，于是对整个生成代码做一次大的重构。</p>
-
-<p>从工厂流水线的工作方式得到启发，感觉 NICE 的评测和方案生成就象是流水线作业。NICE 评测从输入到评测报告的过程，可以抽象为 input 经过一系列的 analyzer 的处理，最后得到一个 evaluation result的过程。而 NICE 方案可以抽象为，输入是 input 和评测报告，经过一系列 builder 的处理，最后得多一个 solution result.</p>
-
-<p>重构后，NICE 评测生成过程的核心类图如下：
-<img src="/images/house/analyzer.png" alt="Analyzer" /></p>
-
-<p>重构后，NICE 评测的主控过程代码：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">EvaluationResult</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>  <span class="c1"># Order of analyzer must be restricted</span>
-</span><span class='line'>  <span class="o">[</span>
-</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">BodyAnalyzer</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TagAnalyzer</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Evaluation</span><span class="o">::</span><span class="no">TipAnalyzer</span>
-</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">analyzer</span><span class="o">|</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span> <span class="p">}</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1"># save result ...</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>评测分析过程基类是 Analyzer，BodyAnalyzer，TagAnalyzer 和 TipAnalyzer 都从它继承而来，每一个 Analyzer 完成一部分的评测分析工作。重构之后，扩展评测变得很容易，只要增加一种特定的 Analyzer 即可，而且这个 Analyzer 完全可以从之前的 Analyzer 继承已达到代码复用。</p>
-
-<p>重构后，NICE 方案生成过程的核心类图如下：
-<img src="/images/house/builder.png" alt="Analyzer" /></p>
-
-<p>重构后，NICE 评测的主控过程代码：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">result</span> <span class="o">=</span> <span class="no">SolutionResult</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>  <span class="n">input_wrapper</span> <span class="o">=</span> <span class="no">Solution</span><span class="o">::</span><span class="no">InputWrapper</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">)</span>
-</span><span class='line'>  <span class="c1"># Order of builder must be restricted</span>
-</span><span class='line'>  <span class="o">[</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">PreparingBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">WeekPlanBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">EatTipBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActivityPlanBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">ActTipBuilder</span><span class="p">,</span>
-</span><span class='line'>    <span class="no">Solution</span><span class="o">::</span><span class="no">NoticeBuilder</span>
-</span><span class='line'>  <span class="o">].</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">builder</span><span class="o">|</span>
-</span><span class='line'>    <span class="n">builder</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">input_wrapper</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">build</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1"># save result ...</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>方案生成过程基类是 Builder，PreparingBuilder，WeekPlanBuilder 和 NoticeBuilder 都从它继承而来，每一个 Builder 完成一部分的方案生成工作。</p>
-
-<p>流水线作业的设计模式很适合象 NICE 方案生成的工作，它的特点是：整体过程复杂，可以分解为多个类似的步骤，这些步骤共享相同的输入和输出对象。使用这种设计模式后，代码结果变成简单清晰，而且易于扩展维护。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -1965,6 +2007,10 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
       </li>
     
@@ -1978,10 +2024,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
     
       <li class="post">
         <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a>
       </li>
     
   </ul>

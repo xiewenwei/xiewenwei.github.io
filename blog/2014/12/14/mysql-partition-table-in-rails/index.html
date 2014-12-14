@@ -1,0 +1,277 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Rails 中 MySQL 分区表使用的一个注意事项 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="MySQL 的分区表是一种简单有效的处理极大数据表的特性，通过它可以使应用程序几乎很少改动就能达成对极大数据表的高效处理，但由于 Rails ActiveRecord 设计上一些惯例，可能导致一些数据处理不能利用分区表特性，反而变得很慢，在使用分区表过程中一定要多加注意。 下面以一个例子来说明。在 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/12/14/mysql-partition-table-in-rails/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Rails 中 MySQL 分区表使用的一个注意事项</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-12-14T22:46:00+08:00" pubdate data-updated="true">2014-12-14</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>MySQL 的分区表是一种简单有效的处理极大数据表的特性，通过它可以使应用程序几乎很少改动就能达成对极大数据表的高效处理，但由于 Rails ActiveRecord 设计上一些惯例，可能导致一些数据处理不能利用分区表特性，反而变得很慢，在使用分区表过程中一定要多加注意。</p>
+
+<p>下面以一个例子来说明。在 light 系统中，有一张数据表是 diet_items, 主要字段是 id, schedule_id, meal_order food_id, weight, calory 等等，它的每一条记录表示为用户生成每日的减肥计划（减肥食谱 + 运动计划）中的一条饮食项，平均一条的计划有 10 多条数据，数据量非常大，预计每天生成数据会超过 100 万条，所以对其做了分表处理，根据 schedule_id hash 分成 60 张表，也就是数据将动态分到 60 张表中。分表后 diet_items 的建表语句如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='sql'><span class='line'><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="o">`</span><span class="n">diet_items</span><span class="o">`</span> <span class="p">(</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span> <span class="n">AUTO_INCREMENT</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">schedule_id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">meals_order</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="o">`</span><span class="n">food_id</span><span class="o">`</span> <span class="nb">int</span><span class="p">(</span><span class="mi">11</span><span class="p">)</span> <span class="k">DEFAULT</span> <span class="k">NULL</span><span class="p">,</span>
+</span><span class='line'>  <span class="p">....</span>
+</span><span class='line'>  <span class="k">KEY</span> <span class="n">id</span> <span class="p">(</span><span class="o">`</span><span class="n">id</span><span class="o">`</span><span class="p">),</span>
+</span><span class='line'>  <span class="k">UNIQUE</span> <span class="k">KEY</span> <span class="o">`</span><span class="n">index_diet_items_on_schedule_id_and_id</span><span class="o">`</span> <span class="p">(</span><span class="o">`</span><span class="n">schedule_id</span><span class="o">`</span><span class="p">,</span><span class="o">`</span><span class="n">id</span><span class="o">`</span><span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span><span class='line'><span class="n">PARTITION</span> <span class="k">BY</span> <span class="n">HASH</span> <span class="p">(</span><span class="n">schedule_id</span><span class="p">)</span>
+</span><span class='line'><span class="n">PARTITIONS</span> <span class="mi">60</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>分表之后，所有查询 diet_items 的地方都要求带上 schedule_id，比如获取某一个 schedule 的所有 diet_items，通过 schedule. diet_items，获取某一个 id 的 diet_item 也是通过  <code>schedule.diet_items.find(id)</code> 进行。生成 diet_item 也没有问题，因为生成 diet_item 都是通过 <code>schedule.diet_items.build(data)</code> 方式，在生成的时候都是带了 schedule_id 的。</p>
+
+<p>观察 newrelic 日志，发现 diet_item 的 update 和 destroy 相关的请求特别慢，仔细分析后，发现这两种操作非常忙是由于 ActiveRecord 生成的 sql 并没有带 schedule_id 导致。
+diet_item update 操作 ActiveRecord 生成的 sql 语句类似于 <code>update diet_items set … where id = &lt;id&gt;</code>。
+diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &lt;id&gt;</code>
+因为没有带 schedule_id，导致这两种语句都需要 mysql 扫描 60 张分区表才能够完成一个语句执行，非常慢！</p>
+
+<p>知道原因之后就好办了，把原来的 update 和 destroy 调用改为自定义版本的 update 和 destroy 调用就可以了。</p>
+
+<ul>
+<li><p><code>diet_item.update(attributes)</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).update_all(attributes)</code></p></li>
+<li><p><code>diet_item.destroy</code> 改成 <code>DietItem.where(id: diet_item.id, schedule_id: diet_item.schedule_id).delete_all</code></p></li>
+</ul>
+
+
+<p>这样生成的 sql 都带上 schedule_id 条件，从而避免了扫描全部的分区表，性能提升立竿见影。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-12-14T22:46:00+08:00" pubdate data-updated="true">2014-12-14</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/mysql/'>mysql</a>, <a class='category' href='/blog/categories/rails/'>rails</a>, <a class='category' href='/blog/categories/ruby/'>ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/" title="Previous Post: 如何解决 Rails 中同时修改冲突">&laquo; 如何解决 Rails 中同时修改冲突</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/12/14/mysql-partition-table-in-rails/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/12/14/mysql-partition-table-in-rails/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>
