@@ -1,0 +1,288 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>使用 Redis 进行唯一计数（基数计数）的 3 种方法 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="唯一计数 (也叫基数计数）是网站系统中十分常见的一个功能特性，例如网站需要统计每天访问的人数 unique visitor （也就是 UV）。计数问题很常见，但因为情况的不同，解决起来可能十分复杂：一是需要计数的量可能很大，比如大型的站点每天有数百万的人访问，数据量相当大； &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2014/12/28/cardinality-counting-using-redis/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">使用 Redis 进行唯一计数（基数计数）的 3 种方法</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-12-28T23:06:00+08:00" pubdate data-updated="true">2014-12-28</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>唯一计数 (也叫基数计数）是网站系统中十分常见的一个功能特性，例如网站需要统计每天访问的人数 unique visitor （也就是 UV）。计数问题很常见，但因为情况的不同，解决起来可能十分复杂：一是需要计数的量可能很大，比如大型的站点每天有数百万的人访问，数据量相当大；二是通常还希望扩展计数的维度，比如除了需要每天的 UV，还想知道每周或每月的 UV，这样导致计算十分复杂。</p>
+
+<p>在关系数据库存储的系统里，实现唯一计数的方法就是 <code>select count(distinct &lt;item_id&gt;)</code>，它十分简单，但是如果数据量很大，这个语句执行是很慢的。用关系数据库另外一个问题是查询和插入数据的性能也不高。</p>
+
+<p>Redis 解决这类计数问题得心应手，相比关系数据库速度更快，消耗的资源更少，甚至根据不同情况提供了 3 种不同的方法。</p>
+
+<ol>
+<li>基于 set
+Redis 的 set 用于保存唯一的数据集合，通过它可以快速判断某一个元素是否存在于集合中，也可以快速计算某一个集合的元素个数，另外和可以合并集合到一个新的集合中。涉及的命令如下：</li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SISMEMBER key member  # 判断 member 是否存在
+</span><span class='line'>SADD key member  # 往集合中加入 member
+</span><span class='line'>SCARD key   # 获取集合元素个数 </span></code></pre></td></tr></table></div></figure>
+
+
+<p>基于 set 的方法简单有效，计数精确，适用面广，易于理解，它的缺点是消耗资源比较大（当然比起关系数据库是少很多的），如果元素个数很大（比如上亿的计数），消耗内存很恐怖。</p>
+
+<ol>
+<li>基于 bit
+Redis 的 bit 可以用于实现比 set 内存高度压缩的计数，它通过一个 bit 1 或 0 来存储某个元素是否存在信息。例如网站唯一访客计数，可以把 user_id 作为 bit 的偏移量 offset，设置为 1 表示有访问，使用 1 MB的空间就可以存放 800 多万用户的一天访问计数情况。涉及的命令如下：</li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SETBIT key offset value  # 设置位信息
+</span><span class='line'>GETBIT key offset        # 获取位信息
+</span><span class='line'>BITCOUNT key [start end] # 计数
+</span><span class='line'>BITOP operation destkey key [key ...]  # 位图合并 </span></code></pre></td></tr></table></div></figure>
+
+
+<p>基于 bit 的方法比起 set 空间消耗小得多，但是它要求元素能否简单映射为位偏移，适用面窄了不少，另外它消耗的空间取决于最大偏移量，和计数值无关，如果最大偏移量很大，消耗内存也相当可观。</p>
+
+<ol>
+<li>基于 HyperLogLog
+实现超大数据量精确的唯一计数都是比较困难的，但是如果只是近似的话，计算科学里有很多高效的算法，其中 HyperLogLog Counting 就是其中非常著名的算法，它可以仅仅使用 12 k左右的内存，实现上亿的唯一计数，而且误差控制在百分之一左右。
+涉及的命令如下：</li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>PFADD key element [element ...]  # 加入元素
+</span><span class='line'>PFCOUNT key [key ...]   # 计数</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这种计数方法真的很神奇，我也没有彻底弄明白，有兴趣可以深入研究相关文章。</p>
+
+<p>redis 提供的这三种唯一计数方式各有优劣，可以充分满足不同情况下的计数要求。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-12-28T23:06:00+08:00" pubdate data-updated="true">2014-12-28</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/redis/'>redis</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/12/14/mysql-partition-table-in-rails/" title="Previous Post: Rails 中 MySQL 分区表使用的一个注意事项">&laquo; Rails 中 MySQL 分区表使用的一个注意事项</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数（基数计数）的 3 种方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2014 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2014/12/28/cardinality-counting-using-redis/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2014/12/28/cardinality-counting-using-redis/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

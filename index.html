@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="MySQL 的分区表是一种简单有效的处理极大数据表的特性，通过它可以使应用程序几乎很少改动就能达成对极大数据表的高效处理，但由于 Rails ActiveRecord 设计上一些惯例，可能导致一些数据处理不能利用分区表特性，反而变得很慢，在使用分区表过程中一定要多加注意。 下面以一个例子来说明。在 &hellip;">
+  <meta name="description" content="唯一计数 (也叫基数计数）是网站系统中十分常见的一个功能特性，例如网站需要统计每天访问的人数 unique visitor （也就是 UV）。计数问题很常见，但因为情况的不同，解决起来可能十分复杂：一是需要计数的量可能很大，比如大型的站点每天有数百万的人访问，数据量相当大； &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,99 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数（基数计数）的 3 种方法</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-12-28T23:06:00+08:00" pubdate data-updated="true">2014-12-28</time>
+        
+         | <a href="/blog/2014/12/28/cardinality-counting-using-redis/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>唯一计数 (也叫基数计数）是网站系统中十分常见的一个功能特性，例如网站需要统计每天访问的人数 unique visitor （也就是 UV）。计数问题很常见，但因为情况的不同，解决起来可能十分复杂：一是需要计数的量可能很大，比如大型的站点每天有数百万的人访问，数据量相当大；二是通常还希望扩展计数的维度，比如除了需要每天的 UV，还想知道每周或每月的 UV，这样导致计算十分复杂。</p>
+
+<p>在关系数据库存储的系统里，实现唯一计数的方法就是 <code>select count(distinct &lt;item_id&gt;)</code>，它十分简单，但是如果数据量很大，这个语句执行是很慢的。用关系数据库另外一个问题是查询和插入数据的性能也不高。</p>
+
+<p>Redis 解决这类计数问题得心应手，相比关系数据库速度更快，消耗的资源更少，甚至根据不同情况提供了 3 种不同的方法。</p>
+
+<ol>
+<li>基于 set
+Redis 的 set 用于保存唯一的数据集合，通过它可以快速判断某一个元素是否存在于集合中，也可以快速计算某一个集合的元素个数，另外和可以合并集合到一个新的集合中。涉及的命令如下：</li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SISMEMBER key member  # 判断 member 是否存在
+</span><span class='line'>SADD key member  # 往集合中加入 member
+</span><span class='line'>SCARD key   # 获取集合元素个数 </span></code></pre></td></tr></table></div></figure>
+
+
+<p>基于 set 的方法简单有效，计数精确，适用面广，易于理解，它的缺点是消耗资源比较大（当然比起关系数据库是少很多的），如果元素个数很大（比如上亿的计数），消耗内存很恐怖。</p>
+
+<ol>
+<li>基于 bit
+Redis 的 bit 可以用于实现比 set 内存高度压缩的计数，它通过一个 bit 1 或 0 来存储某个元素是否存在信息。例如网站唯一访客计数，可以把 user_id 作为 bit 的偏移量 offset，设置为 1 表示有访问，使用 1 MB的空间就可以存放 800 多万用户的一天访问计数情况。涉及的命令如下：</li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>SETBIT key offset value  # 设置位信息
+</span><span class='line'>GETBIT key offset        # 获取位信息
+</span><span class='line'>BITCOUNT key [start end] # 计数
+</span><span class='line'>BITOP operation destkey key [key ...]  # 位图合并 </span></code></pre></td></tr></table></div></figure>
+
+
+<p>基于 bit 的方法比起 set 空间消耗小得多，但是它要求元素能否简单映射为位偏移，适用面窄了不少，另外它消耗的空间取决于最大偏移量，和计数值无关，如果最大偏移量很大，消耗内存也相当可观。</p>
+
+<ol>
+<li>基于 HyperLogLog
+实现超大数据量精确的唯一计数都是比较困难的，但是如果只是近似的话，计算科学里有很多高效的算法，其中 HyperLogLog Counting 就是其中非常著名的算法，它可以仅仅使用 12 k左右的内存，实现上亿的唯一计数，而且误差控制在百分之一左右。
+涉及的命令如下：</li>
+</ol>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>PFADD key element [element ...]  # 加入元素
+</span><span class='line'>PFCOUNT key [key ...]   # 计数</span></code></pre></td></tr></table></div></figure>
+
+
+<p>这种计数方法真的很神奇，我也没有彻底弄明白，有兴趣可以深入研究相关文章。</p>
+
+<p>redis 提供的这三种唯一计数方式各有优劣，可以充分满足不同情况下的计数要求。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -800,111 +893,6 @@ capistrano 3.x 设置如下：</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/06/28/2014-boohee-jobs/">【上海】薄荷科技长期寻找靠谱的 Ruby, Web 前端，iOS 和 Android 工程师</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-06-28T07:57:00+08:00" pubdate data-updated="true">2014-06-28</time>
-        
-         | <a href="/blog/2014/06/28/2014-boohee-jobs/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><h3>上海薄荷科技寻找靠谱的高级 Web 前端工程师</h3>
-
-<ul>
-<li> 工作地点：上海浦东新区张江高科技园</li>
-<li> 职位：Ruby, Web 前端，iOS 和 Android 工程师（长期）</li>
-<li> 职责：薄荷 App，薄荷网站和微信平台 Web 程序设计开发，架构设计，代码重构，性能优化。</li>
-</ul>
-
-
-<h3>我们是谁</h3>
-
-<p>薄荷是中国领先移动健康公司，主要产品“薄荷” 是中国最受欢迎的健康健美类 App 之一，用户已近千万，长期位于 App Store 健康健美榜前列，长期位于各大 Android 应用市场健康或生活类应用前列。</p>
-
-<p>我叫谢文威，是薄荷联合创始人，我在 2006 年底和大学同学、上下铺的兄弟马海华一起建立了薄荷。在创立薄荷之前，我曾经做过多年的程序员，DBA，数据挖掘工程师和项目经理，我在薄荷主要负责技 术。薄荷是我第一次创业，走过很多弯路，可谓屡败屡战，所幸我们顽强的生存下来，现在还算有不错的进展。</p>
-
-<p>薄荷一直专注女性健康生活领域，我们十分信奉法国一位哲学家卢梭的一条格言 “在所有的人类知识中，最重要而又最缺乏的是关于人的知识” ，我们相信随着大数据时代，数据化自我时代的到来，基于数据应用改善人的健康和美丽方向一定大有可为。</p>
-
-<h3>寻找什么样的人</h3>
-
-<p>我们希望找到靠谱各领域工程师 ，一些要求如下：</p>
-
-<ul>
-<li> 1 年以上工作经验；</li>
-<li> 精通所在领域相关技术，追求极致用户体验，</li>
-<li> 编程基础良好，追求优雅的代码；</li>
-<li> 热爱技术开发，有极客精神，参与过开源项目或常写技术博客加分哦！</li>
-</ul>
-
-
-<p>我们注重能力包括：</p>
-
-<ul>
-<li> 解决问题能力。自信，积极主动，做事有条理，目标导向。</li>
-<li> 学习能力。乐于学习，善于总结分享，渴望每天都在进步。</li>
-<li> 团队协作能力。诚实，坦率，有责任心，信任、尊重、包容。</li>
-</ul>
-
-
-<h3>我们能为你提供什么</h3>
-
-<ul>
-<li>发挥你能力的舞台</li>
-</ul>
-
-
-<p>薄荷的技术系统正处于从 数百万用户量到数千万量级 演进过程中，这里充满了机会和挑战，如果你是技术大牛，或者渴望快速成长为技术大牛，这里有供你发挥的舞台。如果想未来成为产品经理，或者自己创业，这里也将为你打下坚实的基础。</p>
-
-<ul>
-<li>优雅舒适的环境</li>
-</ul>
-
-
-<p>为了让你写出优雅的代码，我们当然为你提供优雅的工作环境。相比其它互联网公司，薄荷一个特点是女员工比例很高，男女比例是 1 比 2，我们有美女程序员，美女设计师，美女咨询师和美女产品经理 &#8230; 因为我们从事的是女性美丽相关的业务，我们的口号是：与美女一起共事，为美女服务！</p>
-
-<ul>
-<li>超出你预期的回报</li>
-</ul>
-
-
-<p>年薪 10~25 万，上不封顶，取决于你的能力和业绩。目前公司处于快速发展阶段，公司已全面盈利，并且已有顶尖美元风投基金加入（晨兴，SIG，DCM和高通），未来充满无限想象。我们将把你视为伙伴，希望通过一起努力，能够提供远超你预期的回报。</p>
-
-<h3>联系方式</h3>
-
-<p>如果您对我们的工作岗位感兴趣，请把您的简历或情况发邮件到vincent(at)boohee.com，最好能充分展示您的能力，谢谢！</p>
-
-<h3>下面是我们目前的办公环境</h3>
-
-<p><img src="http://bohetest.qiniudn.com/house.jpg" alt="薄荷的办公环境" /></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -920,6 +908,10 @@ capistrano 3.x 设置如下：</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数（基数计数）的 3 种方法</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
       </li>
     
@@ -933,10 +925,6 @@ capistrano 3.x 设置如下：</p>
     
       <li class="post">
         <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a>
       </li>
     
   </ul>
