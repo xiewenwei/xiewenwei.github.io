@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-12-28T23:55:46+08:00</updated>
+  <updated>2014-12-29T00:04:01+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -18,17 +18,18 @@
     <link href="http://xiewenwei.github.com//blog/2014/12/28/cardinality-counting-using-redis/"/>
     <updated>2014-12-28T23:06:00+08:00</updated>
     <id>http://xiewenwei.github.com//blog/2014/12/28/cardinality-counting-using-redis</id>
-    <content type="html"><![CDATA[<p>唯一计数 (也叫基数计数）是网站系统中十分常见的一个功能特性，例如网站需要统计每天访问的人数 unique visitor （也就是 UV）。计数问题很常见，但因为情况的不同，解决起来可能十分复杂：一是需要计数的量可能很大，比如大型的站点每天有数百万的人访问，数据量相当大；二是通常还希望扩展计数的维度，比如除了需要每天的 UV，还想知道每周或每月的 UV，这样导致计算十分复杂。</p>
+    <content type="html"><![CDATA[<p>唯一计数是网站系统中十分常见的一个功能特性，例如网站需要统计每天访问的人数 unique visitor （也就是 UV）。计数问题很常见，但解决起来可能十分复杂：一是需要计数的量可能很大，比如大型的站点每天有数百万的人访问，数据量相当大；二是通常还希望扩展计数的维度，比如除了需要每天的 UV，还想知道每周或每月的 UV，这样导致计算十分复杂。</p>
 
-<p>在关系数据库存储的系统里，实现唯一计数的方法就是 <code>select count(distinct &lt;item_id&gt;)</code>，它十分简单，但是如果数据量很大，这个语句执行是很慢的。用关系数据库另外一个问题是查询和插入数据的性能也不高。</p>
+<p>在关系数据库存储的系统里，实现唯一计数的方法就是 <code>select count(distinct &lt;item_id&gt;)</code>，它十分简单，但是如果数据量很大，这个语句执行是很慢的。用关系数据库另外一个问题是插入数据性能也不高。</p>
 
-<p>Redis 解决这类计数问题得心应手，相比关系数据库速度更快，消耗的资源更少，甚至根据不同情况提供了 3 种不同的方法。</p>
+<p>Redis 解决这类计数问题得心应手，相比关系数据库速度更快，消耗资源更少，甚至提供了 3 种不同的方法。</p>
 
-<ol>
-<li>基于 set
-Redis 的 set 用于保存唯一的数据集合，通过它可以快速判断某一个元素是否存在于集合中，也可以快速计算某一个集合的元素个数，另外和可以合并集合到一个新的集合中。涉及的命令如下：</li>
-</ol>
+<ul>
+<li>1.基于 set</li>
+</ul>
 
+
+<p>Redis 的 set 用于保存唯一的数据集合，通过它可以快速判断某一个元素是否存在于集合中，也可以快速计算某一个集合的元素个数，另外和可以合并集合到一个新的集合中。涉及的命令如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -40,11 +41,12 @@ Redis 的 set 用于保存唯一的数据集合，通过它可以快速判断某
 
 <p>基于 set 的方法简单有效，计数精确，适用面广，易于理解，它的缺点是消耗资源比较大（当然比起关系数据库是少很多的），如果元素个数很大（比如上亿的计数），消耗内存很恐怖。</p>
 
-<ol>
-<li>基于 bit
-Redis 的 bit 可以用于实现比 set 内存高度压缩的计数，它通过一个 bit 1 或 0 来存储某个元素是否存在信息。例如网站唯一访客计数，可以把 user_id 作为 bit 的偏移量 offset，设置为 1 表示有访问，使用 1 MB的空间就可以存放 800 多万用户的一天访问计数情况。涉及的命令如下：</li>
-</ol>
+<ul>
+<li>2.基于 bit</li>
+</ul>
 
+
+<p>Redis 的 bit 可以用于实现比 set 内存高度压缩的计数，它通过一个 bit 1 或 0 来存储某个元素是否存在信息。例如网站唯一访客计数，可以把 user_id 作为 bit 的偏移量 offset，设置为 1 表示有访问，使用 1 MB的空间就可以存放 800 多万用户的一天访问计数情况。涉及的命令如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -58,12 +60,12 @@ Redis 的 bit 可以用于实现比 set 内存高度压缩的计数，它通过�
 
 <p>基于 bit 的方法比起 set 空间消耗小得多，但是它要求元素能否简单映射为位偏移，适用面窄了不少，另外它消耗的空间取决于最大偏移量，和计数值无关，如果最大偏移量很大，消耗内存也相当可观。</p>
 
-<ol>
-<li>基于 HyperLogLog
-实现超大数据量精确的唯一计数都是比较困难的，但是如果只是近似的话，计算科学里有很多高效的算法，其中 HyperLogLog Counting 就是其中非常著名的算法，它可以仅仅使用 12 k左右的内存，实现上亿的唯一计数，而且误差控制在百分之一左右。
-涉及的命令如下：</li>
-</ol>
+<ul>
+<li>3.基于 HyperLogLog</li>
+</ul>
 
+
+<p>实现超大数据量精确的唯一计数都是比较困难的，但是如果只是近似的话，计算科学里有很多高效的算法，其中 HyperLogLog Counting 就是其中非常著名的算法，它可以仅仅使用 12 k左右的内存，实现上亿的唯一计数，而且误差控制在百分之一左右。涉及的命令如下：</p>
 
 <figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
