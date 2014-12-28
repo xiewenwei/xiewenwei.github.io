@@ -4,7 +4,7 @@
   <title><![CDATA[Category: redis | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/redis/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2014-12-29T00:04:01+08:00</updated>
+  <updated>2014-12-29T00:05:11+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -14,7 +14,7 @@
 
   
   <entry>
-    <title type="html"><![CDATA[使用 Redis 进行唯一计数（基数计数）的 3 种方法]]></title>
+    <title type="html"><![CDATA[使用 Redis 进行唯一计数的 3 种方法]]></title>
     <link href="http://xiewenwei.github.com//blog/2014/12/28/cardinality-counting-using-redis/"/>
     <updated>2014-12-28T23:06:00+08:00</updated>
     <id>http://xiewenwei.github.com//blog/2014/12/28/cardinality-counting-using-redis</id>
