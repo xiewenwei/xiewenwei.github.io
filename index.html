@@ -107,14 +107,14 @@
 
 <p>Rails 的官方文档中提到，mattr_accessor 用于为类属性定义类和实例对象两者的访问器，然后还提供一段示例代码演示其用法。</p>
 
-<p>演示代码如下：</p>
-
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
 </pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">mattr_accessor</span><span class="p">(</span><span class="o">*</span><span class="n">syms</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">blk</span><span class="p">)</span> <span class="kp">public</span>
 </span><span class='line'><span class="no">Defines</span> <span class="n">both</span> <span class="k">class</span> <span class="ow">and</span> <span class="n">instance</span> <span class="n">accessors</span> <span class="k">for</span> <span class="k">class</span> <span class="n">attributes</span><span class="o">.</span>
 </span></code></pre></td></tr></table></div></figure>
 
+
+<p>演示代码如下：</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -156,7 +156,7 @@
 
 <h2>探寻原因</h2>
 
-<p>mattr_accessor 系列方法的代码在 rails/activesupport/lib/active_support/core_ext/module/attribute_accessors.rb 文件中，相关的代码并不复杂，部分代码如下：</p>
+<p>mattr_accessor 系列方法的代码在 <code>rails/activesupport/lib/active_support/core_ext/module/attribute_accessors.rb</code> 文件中，相关的代码并不复杂，部分代码如下：</p>
 
 <figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
 <span class='line-number'>2</span>
@@ -308,7 +308,7 @@
 
 <h2>总结</h2>
 
-<p>Rails 官方文档中关于 mattr_accessor 的描述的确问题，示例代码不能正确运行，而且还会误导使用者，通过仔细探索 Rails 的源代码，找到了问题的源头。我已经修正文档的错误，提交了 pull request，希望能够被接受。</p>
+<p>Rails 官方文档中关于 mattr_accessor 的描述的确有问题，示例代码不能正确运行，而且还会误导使用者，通过仔细探索 Rails 的源代码，找到了问题的源头。我已经修正文档的错误，提交了 <code>pull request</code>，希望能够被接受。</p>
 </div>
   
   

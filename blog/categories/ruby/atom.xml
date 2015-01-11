@@ -4,7 +4,7 @@
   <title><![CDATA[Category: ruby | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/ruby/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2015-01-11T23:04:40+08:00</updated>
+  <updated>2015-01-11T23:16:34+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -25,11 +25,11 @@
 
 <p>Rails 的官方文档中提到，mattr_accessor 用于为类属性定义类和实例对象两者的访问器，然后还提供一段示例代码演示其用法。</p>
 
-<p>演示代码如下：
-<code>ruby
+<p><code>ruby
 mattr_accessor(*syms, &amp;blk) public
 Defines both class and instance accessors for class attributes.
 </code>
+演示代码如下：
 ```ruby</p>
 
 <pre><code>module HairColors
@@ -59,7 +59,7 @@ from (pry):7:in `__pry__'
 
 <h2>探寻原因</h2>
 
-<p>mattr_accessor 系列方法的代码在 rails/activesupport/lib/active_support/core_ext/module/attribute_accessors.rb 文件中，相关的代码并不复杂，部分代码如下：</p>
+<p>mattr_accessor 系列方法的代码在 <code>rails/activesupport/lib/active_support/core_ext/module/attribute_accessors.rb</code> 文件中，相关的代码并不复杂，部分代码如下：</p>
 
 <p>```ruby
   # 此处忽略注释
@@ -162,7 +162,7 @@ HairColors.hair_colors # =&gt; undefined method `hair_colors' for HairColors:Mod
 
 <h2>总结</h2>
 
-<p>Rails 官方文档中关于 mattr_accessor 的描述的确问题，示例代码不能正确运行，而且还会误导使用者，通过仔细探索 Rails 的源代码，找到了问题的源头。我已经修正文档的错误，提交了 pull request，希望能够被接受。</p>
+<p>Rails 官方文档中关于 mattr_accessor 的描述的确有问题，示例代码不能正确运行，而且还会误导使用者，通过仔细探索 Rails 的源代码，找到了问题的源头。我已经修正文档的错误，提交了 <code>pull request</code>，希望能够被接受。</p>
 ]]></content>
   </entry>
   
