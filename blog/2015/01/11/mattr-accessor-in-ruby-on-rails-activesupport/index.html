@@ -1,0 +1,442 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Rails 中 mattr_accessor 一处文档错误 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="发现错误 最近写一个 gem 的时候偶然接触到 Rails ActiveSupport 扩展 module 的 mattr_accessor 系列方法，包括 mattr_accessor、mattr_reader 和 mattr_writer。
+记得以前探索 Rails 源代码的时候经常遇到 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Rails 中 mattr_accessor 一处文档错误</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-01-11T21:49:00+08:00" pubdate data-updated="true">2015-01-11</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><h2>发现错误</h2>
+
+<p>最近写一个 gem 的时候偶然接触到 Rails ActiveSupport 扩展 module 的 mattr_accessor 系列方法，包括 mattr_accessor、mattr_reader 和 mattr_writer。
+记得以前探索 Rails 源代码的时候经常遇到 mattr_accessor 方法，当时并没有细究，这次碰巧要自己用到，所以仔细研究了其文档和实现源码，居然发现文档描述有明显的错误。</p>
+
+<p>Rails 的官方文档中提到，mattr_accessor 用于为类属性定义类和实例对象两者的访问器，然后还提供一段示例代码演示其用法。</p>
+
+<p>演示代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">mattr_accessor</span><span class="p">(</span><span class="o">*</span><span class="n">syms</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">blk</span><span class="p">)</span> <span class="kp">public</span>
+</span><span class='line'><span class="no">Defines</span> <span class="n">both</span> <span class="k">class</span> <span class="ow">and</span> <span class="n">instance</span> <span class="n">accessors</span> <span class="k">for</span> <span class="k">class</span> <span class="n">attributes</span><span class="o">.</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">HairColors</span>
+</span><span class='line'>  <span class="n">mattr_accessor</span> <span class="ss">:hair_colors</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">Person</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">HairColors</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="no">Person</span><span class="o">.</span><span class="n">hair_colors</span> <span class="o">=</span> <span class="o">[</span><span class="ss">:brown</span><span class="p">,</span> <span class="ss">:black</span><span class="p">,</span> <span class="ss">:blonde</span><span class="p">,</span> <span class="ss">:red</span><span class="o">]</span>
+</span><span class='line'><span class="no">Person</span><span class="o">.</span><span class="n">hair_colors</span>     <span class="c1"># =&gt; [:brown, :black, :blonde, :red]</span>
+</span><span class='line'><span class="no">Person</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">hair_colors</span> <span class="c1"># =&gt; [:brown, :black, :blonde, :red]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>当我运行该代码的时候，发现无法运行，报错在 <code>Person.hair_colors</code> 处，信息如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="o">[</span><span class="mi">5</span><span class="o">]</span> <span class="n">pry</span><span class="p">(</span><span class="n">main</span><span class="p">)</span><span class="o">&gt;</span> <span class="no">Person</span><span class="o">.</span><span class="n">hair_colors</span> <span class="o">=</span> <span class="o">[</span><span class="ss">:brown</span><span class="p">,</span> <span class="ss">:black</span><span class="p">,</span> <span class="ss">:blonde</span><span class="p">,</span> <span class="ss">:red</span><span class="o">]</span>
+</span><span class='line'><span class="no">NoMethodError</span><span class="p">:</span> <span class="n">undefined</span> <span class="nb">method</span> <span class="sb">`hair_colors=&#39; for Person:Class</span>
+</span><span class='line'><span class="sb">from (pry):7:in `</span><span class="n">__pry__</span><span class="err">&#39;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>刚开始还有点不相信，分别在 Rails 4.1.8，4.2.0 和 3.2.x，Ruby 1.9.3，2.0.0 和 2.1.5 下运行， 都出现这个错误，这下确信文档描述应该是有问题的。我想把问题彻底搞清楚，于是仔细查看 Rails ActiveSupport 中相关的源代码，发现的确是文档描述的行为和程序实际行为不符。</p>
+
+<h2>探寻原因</h2>
+
+<p>mattr_accessor 系列方法的代码在 rails/activesupport/lib/active_support/core_ext/module/attribute_accessors.rb 文件中，相关的代码并不复杂，部分代码如下：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="c1"># 此处忽略注释</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">mattr_writer</span><span class="p">(</span><span class="o">*</span><span class="n">syms</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">options</span> <span class="o">=</span> <span class="n">syms</span><span class="o">.</span><span class="n">extract_options!</span>
+</span><span class='line'>    <span class="n">syms</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">sym</span><span class="o">|</span>
+</span><span class='line'>      <span class="k">raise</span> <span class="no">NameError</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s2">&quot;invalid attribute name: </span><span class="si">#{</span><span class="n">sym</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">unless</span> <span class="n">sym</span> <span class="o">=~</span> <span class="sr">/^[_A-Za-z]\w*$/</span>
+</span><span class='line'>      <span class="nb">class_eval</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="no">EOS</span><span class="p">,</span> <span class="bp">__FILE__</span><span class="p">,</span> <span class="bp">__LINE__</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+</span><span class='line'><span class="sh">        @@#{sym} = nil unless defined? @@#{sym}</span>
+</span><span class='line'>
+</span><span class='line'><span class="sh">        def self.#{sym}=(obj)</span>
+</span><span class='line'><span class="sh">          @@#{sym} = obj</span>
+</span><span class='line'><span class="sh">        end</span>
+</span><span class='line'><span class="no">      EOS</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="k">unless</span> <span class="n">options</span><span class="o">[</span><span class="ss">:instance_writer</span><span class="o">]</span> <span class="o">==</span> <span class="kp">false</span> <span class="o">||</span> <span class="n">options</span><span class="o">[</span><span class="ss">:instance_accessor</span><span class="o">]</span> <span class="o">==</span> <span class="kp">false</span>
+</span><span class='line'>        <span class="nb">class_eval</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="no">EOS</span><span class="p">,</span> <span class="bp">__FILE__</span><span class="p">,</span> <span class="bp">__LINE__</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+</span><span class='line'><span class="sh">          def #{sym}=(obj)</span>
+</span><span class='line'><span class="sh">            @@#{sym} = obj</span>
+</span><span class='line'><span class="sh">          end</span>
+</span><span class='line'><span class="no">        EOS</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>      <span class="nb">send</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">#{</span><span class="n">sym</span><span class="si">}</span><span class="s2">=&quot;</span><span class="p">,</span> <span class="k">yield</span><span class="p">)</span> <span class="k">if</span> <span class="nb">block_given?</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># 此处忽略注释</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">mattr_accessor</span><span class="p">(</span><span class="o">*</span><span class="n">syms</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">blk</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">mattr_reader</span><span class="p">(</span><span class="o">*</span><span class="n">syms</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">blk</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">mattr_writer</span><span class="p">(</span><span class="o">*</span><span class="n">syms</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">blk</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>从中可以看到，mattr_accessor 分别 call mattr_reader 和 mattr_writer，mattr_writer 的主要逻辑是定义类变量（class variable，命名为 <code>@@#{sym}</code>），然后定义类方法 （见 <code>def self.#{sym}=(obj)</code>）和普通实例方法（见 <code>def #{sym}=(obj)</code>）。当 <code>Person include HairColors</code> 的时候，普通实例方法是 mix 进 Person 的，但类方法并不会被 mix 进 Person。可以用下面更简明的例子演示 include module 并不能 mix 类方法。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">module</span> <span class="nn">Foo</span>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">method1</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;method1 in Foo&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">method2</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;method2 in Foo as class method&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">class</span> <span class="nc">Bar</span>
+</span><span class='line'>    <span class="kp">include</span> <span class="no">Foo</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="no">Bar</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">method1</span>  <span class="c1"># =&gt; &quot;method1 in Foo&quot;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="no">Foo</span><span class="o">.</span><span class="n">method2</span> <span class="c1"># =&gt; &quot;method2 in Foo as class method&quot;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="no">Bar</span><span class="o">.</span><span class="n">method2</span> <span class="c1"># =&gt; NoMethodError: undefined method `method2&#39; for #&lt;Bar:0x007fdb0a121488&gt;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>原来 mattr_accessor 为 HairColors 生成的 <code>def self.hair_colors</code> 类方法不能 mix 进 Person，从而导致 Person.hair_colors 出错，但是 Person.new.hair_colors 能够正常运行的。</p>
+
+<h2>解决方法</h2>
+
+<p>如果希望 Person 通过类方法和实例方法都能使用 hair_colors ，应该怎么做呢？
+可以把 mattr_accessor 放在 included 钩子中执行，代码如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">HairColors</span>
+</span><span class='line'>  <span class="kp">extend</span> <span class="no">ActiveSupport</span><span class="o">::</span><span class="no">Concern</span>
+</span><span class='line'>  <span class="n">included</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">mattr_accessor</span> <span class="ss">:hair_colors</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">Person</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">HairColors</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="no">Person</span><span class="o">.</span><span class="n">hair_colors</span> <span class="o">=</span> <span class="o">[</span><span class="ss">:brown</span><span class="p">,</span> <span class="ss">:black</span><span class="p">,</span> <span class="ss">:blonde</span><span class="p">,</span> <span class="ss">:red</span><span class="o">]</span>
+</span><span class='line'><span class="no">Person</span><span class="o">.</span><span class="n">hair_colors</span>     <span class="c1"># =&gt; [:brown, :black, :blonde, :red]</span>
+</span><span class='line'><span class="no">Person</span><span class="o">.</span><span class="n">new</span><span class="o">.</span><span class="n">hair_colors</span> <span class="c1"># =&gt; [:brown, :black, :blonde, :red]</span>
+</span><span class='line'><span class="no">HairColors</span><span class="o">.</span><span class="n">hair_colors</span> <span class="c1"># =&gt; undefined method `hair_colors&#39; for HairColors:Module</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>它的一个问题是 <code>HairColors.hair_colors</code> 不可用了，但我发现 Rails 中大多是使用这种手法处理的，这种情况下估计不怎么要直接用到 <code>HairColors.hair_colors</code> 吧。</p>
+
+<h2>总结</h2>
+
+<p>Rails 官方文档中关于 mattr_accessor 的描述的确问题，示例代码不能正确运行，而且还会误导使用者，通过仔细探索 Rails 的源代码，找到了问题的源头。我已经修正文档的错误，提交了 pull request，希望能够被接受。</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-01-11T21:49:00+08:00" pubdate data-updated="true">2015-01-11</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/activesupport/'>activesupport</a>, <a class='category' href='/blog/categories/rails/'>rails</a>, <a class='category' href='/blog/categories/ruby/'>ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/12/28/cardinality-counting-using-redis/" title="Previous Post: 使用 Redis 进行唯一计数的 3 种方法">&laquo; 使用 Redis 进行唯一计数的 3 种方法</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">Rails 中 mattr_accessor 一处文档错误</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数的 3 种方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2015 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

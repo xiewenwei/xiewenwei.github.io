@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="上海薄荷科技寻找靠谱的高级 Web 前端工程师 工作地点：上海浦东新区张江高科技园 职位：Ruby, Web 前端，iOS 和 Android 工程师（长期） 职责：薄荷 App，薄荷网站和微信平台 Web 程序设计开发，架构设计，代码重构，性能优化。 我们是谁 薄荷是中国领先移动健康公司， &hellip;">
+  <meta name="description" content="上周在 ruby-china 上发了帖子《MongoDB 那些坑》，反映相当热烈，许多回复很有见地，其中一位童鞋深入的提到 MongoDB 建索引方法的问题，引发我更深入的了解了 MongoDB 建索引的方法和一些注意事项。 在 《MongoDB 那些坑》中提到，在前台直接运行建立索引命令的话， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,61 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/06/29/build-index-in-mongodb/">MongoDB 中建索引注意事项</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-06-29T23:42:00+08:00" pubdate data-updated="true">2014-06-29</time>
+        
+         | <a href="/blog/2014/06/29/build-index-in-mongodb/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>上周在 ruby-china 上发了帖子《MongoDB 那些坑》，反映相当热烈，许多回复很有见地，其中一位童鞋深入的提到 MongoDB 建索引方法的问题，引发我更深入的了解了 MongoDB 建索引的方法和一些注意事项。</p>
+
+<p>在 《MongoDB 那些坑》中提到，在前台直接运行建立索引命令的话，将造成整个数据库阻塞，因此索引建议使用 background 的方式建立。但是这也会带来一定的问题，在 2.6 版本之前，在 secondary server 中即使使用 background 方式建立索引，secondary 还是会以 foreground 方式建立索引，它导致 secondary 同样引发数据库阻塞问题。2.6 版本修复了这个 Bug，2.6 版之后使用 background 方式建立索引时，真正转向后台运行了。</p>
+
+<p>为了尽量降低建立索引对 MongoDB Server 的影响，有一种方法是把 MongoDB Server 转换成 standalone 模式后建立。具体做法如下：</p>
+
+<ol>
+<li><p>首先把 secondary server 停止，在取消 <code>--replSet</code> 参数，并且更改 MongoDB port 之后重新启动 MongoDB，这时候 MongoDB 将进入 standalone 模式；</p></li>
+<li><p>在 standalone 模式下运行命令 ensureIndex 建立索引，建议使用 foreground 方式运行；</p></li>
+<li><p>建立索引完毕之后关闭 secondary server 按正常方式启动;</p></li>
+<li><p>根据上述 1~3 的步骤轮流为 secondary 建立索引，最后把 primary server 临时转换为 secondary server，同样按 1~3 的方法建立索引，再把其转换为 primary server。</p></li>
+</ol>
+
+
+<p> 这种方式还是比较麻烦的，但可以把建立索引操作对 MongoDB 的影响降到最低，在有些情况下还是值得做的。</p>
+
+<p> 参考资料：
+ <a href="http://docs.mongodb.org/manual/tutorial/build-indexes-on-replica-sets/">build-indexes-on-replica-sets</a></p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1577,402 +1632,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2013/05/05/new-features-of-ruby-2-dot-0/">Ruby 2.0的新特性，用例子说明</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2013-05-05T22:52:00+08:00" pubdate data-updated="true">2013-05-05</time>
-        
-         | <a href="/blog/2013/05/05/new-features-of-ruby-2-dot-0/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Ruby 2.0 发布已经有一段时间了，之前从各种报道上大概了解到它的一些主要特性，但是没有认真仔细研究，所以印象并不深。这个周末好好研究了一番，写下这篇 Blog，算是这次学习的笔记。</p>
-
-
-
-
-<p>Ruby 2.0 升级变动并不是很大，至少比 Ruby 1.8 到 1.9 的变动小，之所以把版本号定为 2.0，是为了纪念 Ruby 诞生 20 周年，所以特意选择了 Ruby 诞生 20 周日的日子 &#8211; 2013年2月24日发布。</p>
-
-
-
-
-<p>虽然说变化不是特别大，但是新的特性还是挺让人兴奋的，因为它们对开发带来不少便利，让 Ruby 变得越来越性感。主要的新特性有 4 个，下面一一讲解。</p>
-
-
-
-
-<h2>1. Keyword Arguments</h2>
-
-
-
-
-<p><code>Keyword Arguments</code> 特性让 Ruby 2.0 开始支持关键字参数，这对处理有默认值的参数带来非常大的便利。相比于以前使用 Hash 传值方法，Keyword Arguments 可以让代码更直观简洁。</p>
-
-
-
-
-<p>例子1：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># Ruby 1.9:</span>
-</span><span class='line'>  <span class="c1"># (From action_view/helpers/text_helper.rb)</span>
-</span><span class='line'><span class="k">def</span> <span class="nf">cycle</span><span class="p">(</span><span class="n">first_value</span><span class="p">,</span> <span class="o"><em></span><span class="n">values</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">options</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">extract_options!</span>
-</span><span class='line'>  <span class="nb">name</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="ss">:name</span><span class="p">,</span> <span class="s1">&#39;default&#39;</span><span class="p">)</span>
-</span><span class='line'>  <span class="c1"># ...</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1"># Ruby 2.0:</span>
-</span><span class='line'><span class="k">def</span> <span class="nf">cycle</span><span class="p">(</span><span class="n">first_value</span><span class="p">,</span> <span class="o"></em></span><span class="n">values</span><span class="p">,</span> <span class="nb">name</span><span class="p">:</span> <span class="s1">&#39;default&#39;</span><span class="p">)</span>
-</span><span class='line'>  <span class="c1"># ...</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>例子2：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># Ruby 1.9</span>
-</span><span class='line'><span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">opts</span> <span class="o">=</span> <span class="p">{})</span>
-</span><span class='line'>  <span class="n">opts</span> <span class="o">=</span> <span class="p">{</span><span class="n">fmt</span><span class="p">:</span> <span class="s1">&#39;html&#39;</span><span class="p">}</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">opts</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">r</span> <span class="o">=</span> <span class="no">Renderer</span><span class="o">.</span><span class="n">for</span><span class="p">(</span><span class="n">opts</span><span class="o">[</span><span class="ss">:fmt</span><span class="o">]</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">r</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1"># Ruby 2.0</span>
-</span><span class='line'><span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">fmt</span><span class="p">:</span> <span class="s1">&#39;html&#39;</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">r</span> <span class="o">=</span> <span class="no">Renderer</span><span class="o">.</span><span class="n">for</span><span class="p">(</span><span class="n">fmt</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">r</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>例子3：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># Ruby 1.9</span>
-</span><span class='line'><span class="k">def</span> <span class="nf">accepts_nested_attributes_for</span><span class="p">(</span><span class="o"><em></span><span class="n">attr_names</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
-</span><span class='line'>    <span class="ss">:allow_destroy</span> <span class="o">=&gt;</span> <span class="kp">false</span><span class="p">,</span>
-</span><span class='line'>    <span class="ss">:update_only</span> <span class="o">=&gt;</span> <span class="kp">false</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'>  <span class="n">options</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">attr_names</span><span class="o">.</span><span class="n">extract_options!</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">options</span><span class="o">.</span><span class="n">assert_valid_keys</span><span class="p">(</span>
-</span><span class='line'>    <span class="ss">:allow_destroy</span><span class="p">,</span>
-</span><span class='line'>    <span class="ss">:reject_if</span><span class="p">,</span>
-</span><span class='line'>    <span class="ss">:limit</span><span class="p">,</span>
-</span><span class='line'>    <span class="ss">:update_only</span>
-</span><span class='line'>  <span class="p">)</span>
-</span><span class='line'>  <span class="c1"># ...</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1"># Ruby 2.0</span>
-</span><span class='line'><span class="k">def</span> <span class="nf">accepts_nested_attributes_for</span><span class="p">(</span><span class="o"></em></span><span class="n">attr_names</span><span class="p">,</span>
-</span><span class='line'>  <span class="n">allow_destroy</span><span class="p">:</span> <span class="kp">false</span><span class="p">,</span>
-</span><span class='line'>  <span class="n">update_only</span><span class="p">:</span> <span class="kp">false</span>
-</span><span class='line'>  <span class="n">reject_if</span><span class="p">:</span> <span class="kp">nil</span><span class="p">,</span>
-</span><span class='line'>  <span class="n">limit</span><span class="p">:</span> <span class="kp">nil</span>
-</span><span class='line'><span class="p">)</span>
-</span><span class='line'> <span class="c1"># ...</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<h2>2. Refinement</h2>
-
-
-
-
-<p>Refinement 的目标是通过减少补丁的应用范围使打动态补丁（monkey patching）更为安全。下面是由Matz给出的一个例子，MathN模块包含进来之后“/”操作符才能在Fixnum上使用：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">MathN</span>
-</span><span class='line'>  <span class="n">refine</span> <span class="no">Fixnum</span> <span class="k">do</span>
-</span><span class='line'>    <span class="k">def</span> <span class="nf">/</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="n">quo</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">class</span> <span class="nc">Foo</span>
-</span><span class='line'>  <span class="n">using</span> <span class="no">MathN</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">foo</span>
-</span><span class='line'>    <span class="nb">p</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">2</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>Rails 中有不少对 Ruby 的 monkey patching，使用 Refinement 特性重写的话可以让这些代码更安全。
-但是目前 Refinement 还不是很成熟，属于体验特性，所以最好不要在生产环境使用。</p>
-
-
-
-
-<h2>3. Module Prepend</h2>
-
-
-
-
-<p><code>Module Prepend</code> 特性让常见的 alias_method patten 扩展一个已用方法的写法变得简洁不少。
-例如，下面的代码想对 Template 的 render 方法扩展计时钩子，使用 Ruby 1.9 的写法非常臃肿。</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-<span class='line-number'>26</span>
-<span class='line-number'>27</span>
-<span class='line-number'>28</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">Template</span>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">erb</span><span class="p">)</span>
-</span><span class='line'>    <span class="vi">@erb</span> <span class="o">=</span> <span class="n">erb</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">render</span> <span class="n">values</span>
-</span><span class='line'>    <span class="no">ERB</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="vi">@erb</span><span class="p">)</span><span class="o">.</span><span class="n">result</span><span class="p">(</span><span class="nb">binding</span><span class="p">)</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">module</span> <span class="nn">RenderProfiler</span>
-</span><span class='line'>  <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">included</span> <span class="n">base</span>
-</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">send</span> <span class="ss">:alias_method</span><span class="p">,</span> <span class="ss">:render_without_profiling</span><span class="p">,</span> <span class="ss">:render</span>
-</span><span class='line'>    <span class="n">base</span><span class="o">.</span><span class="n">send</span> <span class="ss">:alias_method</span><span class="p">,</span> <span class="ss">:render</span><span class="p">,</span> <span class="ss">:render_with_profiling</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">render_with_profiling</span> <span class="n">values</span>
-</span><span class='line'>    <span class="n">start</span> <span class="o">=</span> <span class="no">Time</span><span class="o">.</span><span class="n">now</span>
-</span><span class='line'>    <span class="n">render_without_profiling</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">tap</span> <span class="p">{</span>
-</span><span class='line'>      <span class="vg">$stderr</span><span class="o">.</span><span class="n">puts</span> <span class="s2">&quot;Rendered in </span><span class="si">#{</span><span class="no">Time</span><span class="o">.</span><span class="n">now</span> <span class="o">-</span> <span class="n">start</span><span class="si">}</span><span class="s2">s.&quot;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">class</span> <span class="nc">Template</span>
-</span><span class='line'>  <span class="kp">include</span> <span class="no">RenderProfiler</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="no">Template</span><span class="o">.</span><span class="n">ancestors</span>
-</span><span class='line'>  <span class="c1">#=&gt; [Template, RenderProfiler, Object, Kernel, BasicObject]</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>使用 Ruby 2.0 的写法将变得非常简洁。</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">module</span> <span class="nn">RenderProfiler</span>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">render</span> <span class="n">values</span>
-</span><span class='line'>    <span class="n">start</span> <span class="o">=</span> <span class="no">Time</span><span class="o">.</span><span class="n">now</span>
-</span><span class='line'>    <span class="k">super</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">tap</span> <span class="p">{</span>
-</span><span class='line'>      <span class="vg">$stderr</span><span class="o">.</span><span class="n">puts</span> <span class="s2">&quot;Rendered in </span><span class="si">#{</span><span class="no">Time</span><span class="o">.</span><span class="n">now</span> <span class="o">-</span> <span class="n">start</span><span class="si">}</span><span class="s2">s.&quot;</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">class</span> <span class="nc">Template</span>
-</span><span class='line'>  <span class="n">prepend</span> <span class="no">RenderProfiler</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="no">Template</span><span class="o">.</span><span class="n">ancestors</span>
-</span><span class='line'>  <span class="c1">#=&gt; [RenderProfiler, Template, Object, Kernel, BasicObject]</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>注意 include 和 prepend 的区别在于，执行后 ancestors 有明显不同，include 置于后方，而 prepend 置于前方，这就导致了方法查找路径的差异，从而导致 <code>super</code> 执行结果的差异。</p>
-
-
-
-
-<h2>4. Lazy Enumerable</h2>
-
-
-
-
-<p>Lazy Enumerable 可以让 Enumerable 不立即执行，这对函数式编程大有用处，例子如下：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">def</span> <span class="nf">natural_numbers</span>
-</span><span class='line'>  <span class="p">(</span><span class="mi">1</span><span class="o">.</span><span class="n">.</span><span class="no">Float</span><span class="o">::</span><span class="no">INFINITY</span><span class="p">)</span><span class="o">.</span><span class="n">lazy</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">def</span> <span class="nf">primes</span>
-</span><span class='line'>  <span class="n">natural_numbers</span><span class="o">.</span><span class="n">select</span> <span class="p">{</span><span class="o">|</span><span class="n">n</span><span class="o">|</span>
-</span><span class='line'>    <span class="p">(</span><span class="mi">2</span><span class="o">.</span><span class="n">.</span><span class="p">(</span><span class="n">n</span><span class="o">**</span><span class="mi">0</span><span class="o">.</span><span class="mi">5</span><span class="p">))</span><span class="o">.</span><span class="n">all?</span> <span class="p">{</span><span class="o">|</span><span class="n">f</span><span class="o">|</span>
-</span><span class='line'>      <span class="n">n</span> <span class="o">%</span> <span class="n">f</span> <span class="o">&gt;</span> <span class="mi">0</span>
-</span><span class='line'>    <span class="p">}</span>
-</span><span class='line'>  <span class="p">}</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">primes</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="o">.</span><span class="n">to_a</span>
-</span><span class='line'>  <span class="c1">#=&gt; [1, 2, 3, 5, 7, 11, 13, 17, 19, 23]</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>除了上面 4 大特性，还有一些小的改变，比如:</p>
-
-
-
-
-<ul>
-<li>默认使用 <code>utf-8 encoding</code> 解析代码</li>
-<li>Symbol 数组 <code>%i(a b c)</code> &#8211;> <code>[:a, :b, :c]</code></li>
-<li>新的 GC</li>
-<li>Ruby的性能也有所提升</li>
-<li>&#8230;</li>
-</ul>
-
-
-
-
-<p>Ruby 2.0 让 Ruby 变得愈发性感了，我喜欢。</p>
-
-
-
-
-<p>参考资料</p>
-
-
-
-
-<ul>
-<li><a href="http://blog.marc-andre.ca/2013/02/23/ruby-2-by-example/">http://blog.marc-andre.ca/2013/02/23/ruby-2-by-example/</a></li>
-<li><a href="http://www.infoq.com/cn/news/2012/11/ruby-20-preview1">http://www.infoq.com/cn/news/2012/11/ruby-20-preview1</a></li>
-<li><a href="http://benhoskin.gs/2013/02/24/ruby-2-0-by-example">http://benhoskin.gs/2013/02/24/ruby-2-0-by-example</a></li>
-</ul>
-
-
-
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/3/">&larr; Older</a>
@@ -1990,6 +1649,10 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">Rails 中 mattr_accessor 一处文档错误</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数的 3 种方法</a>
       </li>
     
@@ -2003,10 +1666,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
     
       <li class="post">
         <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/08/31/avoid-misusing-redis/">避免误用 Redis</a>
       </li>
     
   </ul>
@@ -2023,7 +1682,7 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2014 - vincent -
+  Copyright &copy; 2015 - vincent -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 
