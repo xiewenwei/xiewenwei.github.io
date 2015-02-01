@@ -4,7 +4,7 @@
   <title><![CDATA[Category: ruby | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/ruby/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2015-01-11T23:16:34+08:00</updated>
+  <updated>2015-02-01T21:48:08+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -12,6 +12,25 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[重构系统广播功能]]></title>
+    <link href="http://xiewenwei.github.com//blog/2015/02/01/refactor-broadcast-feature/"/>
+    <updated>2015-02-01T21:16:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2015/02/01/refactor-broadcast-feature</id>
+    <content type="html"><![CDATA[<p>以前薄荷伙伴子系统的广播功能使用 redis 存储数据，随着时间推移数据积累，消耗内存十分严重，属于典型的 redis 误用。现在进行大幅重构，更改为 cache + storage 的存储方式，取消了 redis 存储。重构后，消耗资源大幅下降，性能上还有所改进。</p>
+
+<p>先说说广播功能特性。广播功能主要用于薄荷向全体用法传递的消息（包括各种广告，告示和提醒等），当系统管理员在后台发出一条广播后，用户 app 上的消息图标显示小红点，当用户点击图标进入广播列表查看消息内容后，小红点消除。</p>
+
+<p>重构前，广播功能采用了 redis 存储方案，为每一位用户建立一个已读广播集合 set，该 set 中存放用户已读的广播 id。最常见的操作是获取某位用户未读广播和数量，其方法是：使用全体 广播 id 集合与已读广播 id 集合比较，差异部分就是未读广播，对其计数得到未读广播数量。</p>
+
+<p>这种方法的问题有两个：一是 redis 消耗内存巨大，随着用户数增加和发送广播数量增加，内存一直累积；二是当广播数量增加到比较大的数量后，获取未读广播很慢。</p>
+
+<p>对其重构如下：去除了 redis 存储，在数据库中存储每一个用户最新访问广播的时间 last_read_time，建立一个全体的广播列表缓存，广播列表只存放广播 id 和 created_time，列表根据 created_time 从新到旧排序。获取某个用户未读广播和其数量方法：把广播列表缓存的生成时间 created_time 和用户的 last_read_time 比较，比 last_read_time 大的属于未读广播，比 last_read_time 小的属于已读广播。</p>
+
+<p>这次重构，去除 redis 存储，大幅减少内存使用，算法调整让常见操作速度更快，效果很棒。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Rails 中 mattr_accessor 一处文档错误]]></title>
@@ -711,55 +730,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 <li><a href="http://tenderlovemaking.com/2012/06/18/removing-config-threadsafe.html/">http://tenderlovemaking.com/2012/06/18/removing-config-threadsafe.html/</a></li>
 </ul>
 
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[多 Ruby 版本和 多 Gem 版本测试]]></title>
-    <link href="http://xiewenwei.github.com//blog/2014/01/05/multiple-rubies-and-gems-test-solution/"/>
-    <updated>2014-01-05T22:58:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2014/01/05/multiple-rubies-and-gems-test-solution</id>
-    <content type="html"><![CDATA[<p>admin_gateway 是用于我们所有后台统一认证和授权的组件，而我们后台程序运行在多个 Ruby 版本上，主要是 Ruby 1.9.3 和 2.0，Ruby 2.1 也已经发布了，很快也需要提供 Ruby 2.1 的支持，另外 Rails 版本有 3.0，3.2 和 4.0 三大主要版本，因此一个完整的测试方案是需要包括这 3 * 3 = 9 种组合才行。</p>
-
-<p>首先是多个 Ruby 版本测试。这个问题比较简单，我们现在的 Ruby 环境通常是由 RVM 管理的，RVM 可以很容易的以多个 Ruby 版本重复执行 Ruby 程序，比如下面的例子：
-<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec ruby -e "puts RUBY_VERSION"</code>
-如果运行的机器安装了这3个版本的 Ruby 的话，就会依次执行打出各自的 Ruby 版本号。
-所以下面的命令就可以依次运行3个Ruby版本的测试了：</p>
-
-<p><code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install</code>
-<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code></p>
-
-<p>解决多 Ruby 版本测试的问题，然后就是多 Rails 版本测试的问题。admin_gateway 这个 gem 是一个 Rails Engine，因此需要依赖 Rails。多 Rails 版本测试意味着 test 的 gem 环境是不同的，而现在 gem 环境是由 bundle 管理的，运行 bundle 命令时可以手动指定 Gemfile 文件，因此 建立多个 Gemfile 文件，重复上面的命令就可以了，例如可以建立 rails_4_0.gemfile 这个 Gemfile，然后通过命令
-<code>bundle install --gemfile rails_4_0.gemfile</code>
-执行 gem 环境安装，
-然后通过命令：
-<code>BUNDLE_GEMFILE=rails_4_0.gemfile bundle exec rake test</code>
-执行测试。</p>
-
-<p>组合上面的方法，可以形成一个完整的多 Ruby 版本和 Rails 版本的解决方案：
-1. 首先根据需要安装多个 Ruby 版本，如 ruby 1.9.3, 2.0.0 和 2.1.0，根据需要生成多个 gemfile，如 rails_3_0.gemfile, rails_3_2.gemfile 和 rails_4_0.gemfile
-2. 然后使用下面的 shell 安装 gem 环境和运行测试。
-<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install --gemfile=rails_3_0.gemfile</code>
-<code>BUNDLE_GEMFILE=rails_3_0.gemfile rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code>
-3.2 和 4.0的类似，就不重复了。</p>
-
-<p>解决 gem 多版本的方法有一点不干净，因为 gemfile 有很多重复内容，shell命令也比较重复，因此有一个 gem 叫 appraise （https://github.com/cfedermann/Appraise）就是用于解决这个问题，它只需要配置一个 Appraisals 文件，在 Appraisals 声明不同的 gem 依赖就可以了，比如 admin_gateway 的 Appraisals 内容如下：
-```
-appraise "rails-3-0" do
-  gem "rails", "3.0.20"
-end</p>
-
-<p>appraise "rails-3-2" do
-  gem "rails", "3.2.16"
-end</p>
-
-<p>appraise "rails-4-0" do
-  gem "rails", "4.0.0"
-end
-```
-然后就可以通过 rake appraisal 完成多个 rails 版本测试，它的原理和上面提到的完全一样。</p>
-
-<p>总之，多 Ruby 版本和多 gem 版本的测试并不难，利用 rvm 和 bundle 一些特性可以快速做到，利用 appraisal 可以让其更简化。</p>
 ]]></content>
   </entry>
   

@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="Ruby 2.0 发布已经有一段时间了，之前从各种报道上大概了解到它的一些主要特性，但是没有认真仔细研究，所以印象并不深。这个周末好好研究了一番，写下这篇 Blog，算是这次学习的笔记。 Ruby 2.0 升级变动并不是很大，至少比 Ruby 1.8 到 1.9 的变动小，之所以把版本号定为 2. &hellip;">
+  <meta name="description" content="Web 应用大多是 IO 密集型的，利用 Ruby 多进程+多线程模型将能大幅提升系统吞吐量。其原因在于：当Ruby 某个线程处于 IO Block 状态时，其它的线程还可以继续执行。但由于存在 Ruby GIL (Global Interpreter Lock)，MRI Ruby &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,343 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2013/05/25/ruby-multiple-threads-potential-and-weakness/">实例说明 Ruby 多线程的潜力和弱点</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2013-05-25T22:52:00+08:00" pubdate data-updated="true">2013-05-25</time>
+        
+         | <a href="/blog/2013/05/25/ruby-multiple-threads-potential-and-weakness/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Web 应用大多是 IO 密集型的，利用 Ruby 多进程+多线程模型将能大幅提升系统吞吐量。其原因在于：当Ruby 某个线程处于 IO Block 状态时，其它的线程还可以继续执行。但由于存在 Ruby GIL (Global Interpreter Lock)，MRI Ruby 并不能真正利用多线程进行并行计算。JRuby 去除了 GIL，是真正意义的多线程，既能应付 IO Block，也能充分利用多核 CPU 加快整体运算速度。</p>
+
+
+
+
+<p>上面说得比较抽象，下面就用例子一一加以说明。</p>
+
+
+
+
+<h2>Ruby 多线程和 IO Block</h2>
+
+
+
+
+<p>先看下面一段代码（演示目的，没有实际用途）：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># File: block_io1.rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">func1</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;sleep 3 seconds in func1</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="nb">sleep</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">func2</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;sleep 2 seconds in func2</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="nb">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">func3</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;sleep 5 seconds in func3</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="nb">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">func1</span>
+</span><span class='line'><span class="n">func2</span>
+</span><span class='line'><span class="n">func3</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>代码很简单，3 个方法，用 sleep 模拟耗时的 IO 操作。
+运行代码（环境 MRI Ruby 1.9.3） 结果是：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="err">$</span> <span class="n">time</span> <span class="n">ruby</span> <span class="n">block_io1</span><span class="o">.</span><span class="n">rb</span>
+</span><span class='line'><span class="nb">sleep</span> <span class="mi">3</span> <span class="n">seconds</span> <span class="k">in</span> <span class="n">func1</span>
+</span><span class='line'><span class="nb">sleep</span> <span class="mi">2</span> <span class="n">seconds</span> <span class="k">in</span> <span class="n">func2</span>
+</span><span class='line'><span class="nb">sleep</span> <span class="mi">5</span> <span class="n">seconds</span> <span class="k">in</span> <span class="n">func3</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">real</span>  <span class="mi">0</span><span class="n">m11</span><span class="o">.</span><span class="mi">681</span><span class="n">s</span>
+</span><span class='line'><span class="n">user</span>  <span class="mi">0</span><span class="n">m3</span><span class="o">.</span><span class="mi">086</span><span class="n">s</span>
+</span><span class='line'><span class="n">sys</span> <span class="mi">0</span><span class="n">m0</span><span class="o">.</span><span class="mi">152</span><span class="n">s</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>比较慢，时间都耗在 sleep 上了，总共花了 10 多秒。</p>
+
+
+
+
+<p>采用多线程的方式，改写如下：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># File: block_io2.rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">func1</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;sleep 3 seconds in func1</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="nb">sleep</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">func2</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;sleep 2 seconds in func2</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="nb">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">func3</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;sleep 5 seconds in func3</span><span class="se">\n</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="nb">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">threads</span> <span class="o">=</span> <span class="o">[]</span>
+</span><span class='line'><span class="n">threads</span> <span class="o">&lt;&lt;</span> <span class="no">Thread</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="n">func1</span> <span class="p">}</span>
+</span><span class='line'><span class="n">threads</span> <span class="o">&lt;&lt;</span> <span class="no">Thread</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="n">func2</span> <span class="p">}</span>
+</span><span class='line'><span class="n">threads</span> <span class="o">&lt;&lt;</span> <span class="no">Thread</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="n">func3</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">threads</span><span class="o">.</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">t</span><span class="o">|</span> <span class="n">t</span><span class="o">.</span><span class="n">join</span> <span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>运行的结果是：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="err">$</span> <span class="n">time</span> <span class="n">ruby</span> <span class="n">block_io2</span><span class="o">.</span><span class="n">rb</span>
+</span><span class='line'><span class="nb">sleep</span> <span class="mi">3</span> <span class="n">seconds</span> <span class="k">in</span> <span class="n">func1</span>
+</span><span class='line'><span class="nb">sleep</span> <span class="mi">2</span> <span class="n">seconds</span> <span class="k">in</span> <span class="n">func2</span>
+</span><span class='line'><span class="nb">sleep</span> <span class="mi">5</span> <span class="n">seconds</span> <span class="k">in</span> <span class="n">func3</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">real</span>  <span class="mi">0</span><span class="n">m6</span><span class="o">.</span><span class="mi">543</span><span class="n">s</span>
+</span><span class='line'><span class="n">user</span>  <span class="mi">0</span><span class="n">m3</span><span class="o">.</span><span class="mi">169</span><span class="n">s</span>
+</span><span class='line'><span class="n">sys</span> <span class="mi">0</span><span class="n">m0</span><span class="o">.</span><span class="mi">147</span><span class="n">s</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>总共花了 6 秒多，明显快了许多，只比最长的 sleep 5 秒多了一点。</p>
+
+
+
+
+<p>上面的例子说明，<strong>Ruby 的多线程能够应付 IO Block，当某个线程处于 IO Block 状态时，其它的线程还可以继续执行，从而使整体处理时间大幅缩短</strong>。</p>
+
+
+
+
+<h2>Ruby GIL 的影响</h2>
+
+
+
+
+<p>还是先看一段代码（演示目的）：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># File: gil1.rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;securerandom&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;zlib&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">data</span> <span class="o">=</span> <span class="no">SecureRandom</span><span class="o">.</span><span class="n">hex</span><span class="p">(</span><span class="mi">4096000</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="mi">16</span><span class="o">.</span><span class="n">times</span> <span class="p">{</span> <span class="no">Zlib</span><span class="o">::</span><span class="no">Deflate</span><span class="o">.</span><span class="n">deflate</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>代码先随机生成一些数据，然后对其进行压缩，压缩是非常耗 CPU 的，在我机器(双核 CPU, MRI Ruby 1.9.3)运行结果如下：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="err">$</span> <span class="n">time</span> <span class="n">ruby</span> <span class="n">gil1</span><span class="o">.</span><span class="n">rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">real</span>  <span class="mi">0</span><span class="n">m8</span><span class="o">.</span><span class="mi">572</span><span class="n">s</span>
+</span><span class='line'><span class="n">user</span>  <span class="mi">0</span><span class="n">m8</span><span class="o">.</span><span class="mi">359</span><span class="n">s</span>
+</span><span class='line'><span class="n">sys</span> <span class="mi">0</span><span class="n">m0</span><span class="o">.</span><span class="mi">102</span><span class="n">s</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>更改为多线程版本，代码如下：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># File: gil2.rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;securerandom&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;zlib&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">data</span> <span class="o">=</span> <span class="no">SecureRandom</span><span class="o">.</span><span class="n">hex</span><span class="p">(</span><span class="mi">4096000</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">threads</span> <span class="o">=</span> <span class="o">[]</span>
+</span><span class='line'><span class="mi">16</span><span class="o">.</span><span class="n">times</span> <span class="k">do</span>
+</span><span class='line'>  <span class="n">threads</span> <span class="o">&lt;&lt;</span> <span class="no">Thread</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="no">Zlib</span><span class="o">::</span><span class="no">Deflate</span><span class="o">.</span><span class="n">deflate</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="p">}</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">threads</span><span class="o">.</span><span class="n">each</span> <span class="p">{</span><span class="o">|</span><span class="n">t</span><span class="o">|</span> <span class="n">t</span><span class="o">.</span><span class="n">join</span><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>多线程的版本运行结果如下：</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="err">$</span> <span class="n">time</span> <span class="n">ruby</span> <span class="n">gil2</span><span class="o">.</span><span class="n">rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">real</span>  <span class="mi">0</span><span class="n">m8</span><span class="o">.</span><span class="mi">616</span><span class="n">s</span>
+</span><span class='line'><span class="n">user</span>  <span class="mi">0</span><span class="n">m8</span><span class="o">.</span><span class="mi">377</span><span class="n">s</span>
+</span><span class='line'><span class="n">sys</span> <span class="mi">0</span><span class="n">m0</span><span class="o">.</span><span class="mi">211</span><span class="n">s</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p> 从结果可以看出，由于 MRI Ruby GIL 的存在，Ruby 多线程并不能重复利用多核 CPU，使用多线程后整体所花时间并不缩短，反而由于线程切换的影响，所花时间还略有增加。</p>
+
+
+
+
+<h2>JRuby 去除了 GIL</h2>
+
+
+
+
+<p>使用 JRuby (我的机器上是 JRuby 1.7.0)运行 gil1.rb 和 gil2.rb，得到很不一样的结果。</p>
+
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="err">$</span> <span class="n">time</span> <span class="n">jruby</span> <span class="n">gil1</span><span class="o">.</span><span class="n">rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">real</span>  <span class="mi">0</span><span class="n">m12</span><span class="o">.</span><span class="mi">225</span><span class="n">s</span>
+</span><span class='line'><span class="n">user</span>  <span class="mi">0</span><span class="n">m14</span><span class="o">.</span><span class="mo">060</span><span class="n">s</span>
+</span><span class='line'><span class="n">sys</span> <span class="mi">0</span><span class="n">m0</span><span class="o">.</span><span class="mi">615</span><span class="n">s</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="err">$</span> <span class="n">time</span> <span class="n">jruby</span> <span class="n">gil2</span><span class="o">.</span><span class="n">rb</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">real</span>  <span class="mi">0</span><span class="n">m7</span><span class="o">.</span><span class="mi">584</span><span class="n">s</span>
+</span><span class='line'><span class="n">user</span>  <span class="mi">0</span><span class="n">m22</span><span class="o">.</span><span class="mi">822</span><span class="n">s</span>
+</span><span class='line'><span class="n">sys</span> <span class="mi">0</span><span class="n">m0</span><span class="o">.</span><span class="mi">819</span><span class="n">s</span>
+</span></code></pre></td></tr></table></div></figure></p>
+
+<p>可以看到，JRuby 使用多线程时，整体运行时间有明显缩短（7.58 比 12.22），这是由于 JRuby 去除了 GIL，可以真正并行的执行多线程，充分利用了多核 CPU。</p>
+
+
+
+
+<p>总结：<strong>Ruby 多线程可以在某个线程 IO Block 时，依然能够执行其它线程，从而降低 IO Block 对整体的影响，但由于 MRI Ruby GIL 的存在，MRI Ruby 并不是真正的并行执行，JRuby 去除了 GIL，可以做到真正的多线程并行执行</strong>。</p>
+
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1665,103 +2002,6 @@ Example 4:</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/07/02/ruby-p-vs-puts/">Ruby 中的 p 和 puts</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-07-02T10:41:00+08:00" pubdate data-updated="true">2012-07-02</time>
-        
-         | <a href="/blog/2012/07/02/ruby-p-vs-puts/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>p 和 puts 是 Ruby 中特别常用的方法，很多童鞋可能认为它们是差不多的，使用的时候也不加注意，但是仔细考究起来，它们是有明显差别的。</p>
-
-<p>先举一个例子</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">Foo</span>
-</span><span class='line'>    <span class="k">def</span> <span class="nf">inspect</span>
-</span><span class='line'>      <span class="s2">&quot;foo from inspect&quot;</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">def</span> <span class="nf">to_s</span>
-</span><span class='line'>      <span class="s2">&quot;foo from to_s&quot;</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="n">foo</span> <span class="o">=</span> <span class="no">Foo</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>  <span class="nb">p</span> <span class="n">foo</span>
-</span><span class='line'>  <span class="nb">puts</span> <span class="n">foo</span>
-</span><span class='line'>  <span class="nb">p</span> <span class="s2">&quot;p: &lt;</span><span class="si">#{</span><span class="n">foo</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
-</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;p: &lt;</span><span class="si">#{</span><span class="n">foo</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>这段代码的输出是</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">foo</span> <span class="n">from</span> <span class="nb">inspect</span>
-</span><span class='line'><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span>
-</span><span class='line'><span class="nb">p</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span><span class="o">&gt;</span>
-</span><span class='line'><span class="nb">puts</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">foo</span> <span class="n">from</span> <span class="nb">to_s</span><span class="o">&gt;</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p><code>p obj</code> 相当于 <code>puts obj.inspect</code>，而 <code>puts obj</code> 相当于 <code>puts obj.to_s</code>，
-使用的方便是明显区别的，p 是使用 obj 的 inspect 方法，而 puts 是 to_s 方法。</p>
-
-<p>为什么会这样呢？这个我想可以从 to_s 和 inspect 的区别说起，to_s 是对象的字符串表示，
-是 puts 和双引号字符使用的方法。inspect 是对象状态的表示，通用用于 debug 中。
-Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类名和地址。</p>
-
-<p>所以p 和 puts主要是用途的不同，p 是作为 debug 输出，而 puts 作为对象的字符串表示输出。</p>
-
-<p>另外值得一提的是，在 irb console 中，命令行中表达式求值，使用的是 p 对象的 inspect 方法。另外，通常 debug 输出命令，也是使用对象的 inspect 方法。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -1779,6 +2019,10 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/02/01/refactor-broadcast-feature/">重构系统广播功能</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">Rails 中 mattr_accessor 一处文档错误</a>
       </li>
     
@@ -1792,10 +2036,6 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
     
       <li class="post">
         <a href="/blog/2014/11/16/how-to-resolve-updating-conflict-in-rails/">如何解决 Rails 中同时修改冲突</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/10/26/a-http-sniffer-tool-pproxy/">http 抓包分析工具 pproxy</a>
       </li>
     
   </ul>

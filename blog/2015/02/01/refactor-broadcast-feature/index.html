@@ -5,12 +5,11 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>我们幸福的一家 - 程序人生</title>
+  <title>重构系统广播功能 - 程序人生</title>
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="感谢上苍赐予我和爱妻一对健康可爱的儿女。 弟弟还小，青禾姐姐要多关心弟弟哦。 青禾骑车的姿势很酷吧。 直树很醒目的样子。 青禾在大声呼喊，啊～～
-">
+  <meta name="description" content="以前薄荷伙伴子系统的广播功能使用 redis 存储数据，随着时间推移数据积累，消耗内存十分严重，属于典型的 redis 误用。现在进行大幅重构，更改为 cache + storage 的存储方式，取消了 redis 存储。重构后，消耗资源大幅下降，性能上还有所改进。 先说说广播功能特性。 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -19,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://xiewenwei.github.com//blog/2012/07/02/wo-men-xing-fu-de-yi-jia/">
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2015/02/01/refactor-broadcast-feature/">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
@@ -72,7 +71,7 @@
   
   <header>
     
-      <h1 class="entry-title">我们幸福的一家</h1>
+      <h1 class="entry-title">重构系统广播功能</h1>
     
     
       <p class="meta">
@@ -88,7 +87,7 @@
   
 
 
-<time datetime="2012-07-02T17:20:00+08:00" pubdate data-updated="true">2012-07-02</time>
+<time datetime="2015-02-01T21:16:00+08:00" pubdate data-updated="true">2015-02-01</time>
         
          | <a href="#disqus_thread">Comments</a>
         
@@ -97,23 +96,17 @@
   </header>
 
 
-<div class="entry-content"><p>感谢上苍赐予我和爱妻一对健康可爱的儿女。</p>
+<div class="entry-content"><p>以前薄荷伙伴子系统的广播功能使用 redis 存储数据，随着时间推移数据积累，消耗内存十分严重，属于典型的 redis 误用。现在进行大幅重构，更改为 cache + storage 的存储方式，取消了 redis 存储。重构后，消耗资源大幅下降，性能上还有所改进。</p>
 
-<p><img src="/images/photos/MG_3473_meitu_1.jpg" alt="Photo1" /></p>
+<p>先说说广播功能特性。广播功能主要用于薄荷向全体用法传递的消息（包括各种广告，告示和提醒等），当系统管理员在后台发出一条广播后，用户 app 上的消息图标显示小红点，当用户点击图标进入广播列表查看消息内容后，小红点消除。</p>
 
-<p>弟弟还小，青禾姐姐要多关心弟弟哦。</p>
+<p>重构前，广播功能采用了 redis 存储方案，为每一位用户建立一个已读广播集合 set，该 set 中存放用户已读的广播 id。最常见的操作是获取某位用户未读广播和数量，其方法是：使用全体 广播 id 集合与已读广播 id 集合比较，差异部分就是未读广播，对其计数得到未读广播数量。</p>
 
-<p><img src="/images/photos/MG_3543_meitu_3.jpg" alt="Photo2" /></p>
+<p>这种方法的问题有两个：一是 redis 消耗内存巨大，随着用户数增加和发送广播数量增加，内存一直累积；二是当广播数量增加到比较大的数量后，获取未读广播很慢。</p>
 
-<p>青禾骑车的姿势很酷吧。</p>
+<p>对其重构如下：去除了 redis 存储，在数据库中存储每一个用户最新访问广播的时间 last_read_time，建立一个全体的广播列表缓存，广播列表只存放广播 id 和 created_time，列表根据 created_time 从新到旧排序。获取某个用户未读广播和其数量方法：把广播列表缓存的生成时间 created_time 和用户的 last_read_time 比较，比 last_read_time 大的属于未读广播，比 last_read_time 小的属于已读广播。</p>
 
-<p><img src="/images/photos/MG_3553_meitu_2.jpg" alt="Photo3" /></p>
-
-<p>直树很醒目的样子。</p>
-
-<p><img src="/images/photos/MG_3645_meitu_1.jpg" alt="Photo4" /></p>
-
-<p>青禾在大声呼喊，啊～～</p>
+<p>这次重构，去除 redis 存储，大幅减少内存使用，算法调整让常见操作速度更快，效果很棒。</p>
 </div>
 
 
@@ -136,12 +129,12 @@
   
 
 
-<time datetime="2012-07-02T17:20:00+08:00" pubdate data-updated="true">2012-07-02</time>
+<time datetime="2015-02-01T21:16:00+08:00" pubdate data-updated="true">2015-02-01</time>
       
 
 <span class="categories">
   
-    <a class='category' href='/blog/categories/life/'>life</a>
+    <a class='category' href='/blog/categories/redis/'>redis</a>, <a class='category' href='/blog/categories/ruby/'>ruby</a>
   
 </span>
 
@@ -157,10 +150,8 @@
     
     <p class="meta">
       
-        <a class="basic-alignment left" href="/blog/2012/07/02/ruby-p-vs-puts/" title="Previous Post: Ruby 中的 p 和 puts">&laquo; Ruby 中的 p 和 puts</a>
+        <a class="basic-alignment left" href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/" title="Previous Post: Rails 中 mattr_accessor 一处文档错误">&laquo; Rails 中 mattr_accessor 一处文档错误</a>
       
-      
-        <a class="basic-alignment right" href="/blog/2012/11/12/ruby-block-proc-and-lambda/" title="Next Post: Ruby: block proc and lambda">Ruby: block proc and lambda &raquo;</a>
       
     </p>
   </footer>
@@ -227,8 +218,8 @@
       
         
         // var disqus_developer = 1;
-        var disqus_identifier = 'http://xiewenwei.github.com//blog/2012/07/02/wo-men-xing-fu-de-yi-jia/';
-        var disqus_url = 'http://xiewenwei.github.com//blog/2012/07/02/wo-men-xing-fu-de-yi-jia/';
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2015/02/01/refactor-broadcast-feature/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2015/02/01/refactor-broadcast-feature/';
         var disqus_script = 'embed.js';
       
     (function () {

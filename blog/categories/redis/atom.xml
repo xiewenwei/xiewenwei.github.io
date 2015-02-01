@@ -4,7 +4,7 @@
   <title><![CDATA[Category: redis | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/redis/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2015-01-11T23:16:34+08:00</updated>
+  <updated>2015-02-01T21:48:08+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -12,6 +12,25 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[重构系统广播功能]]></title>
+    <link href="http://xiewenwei.github.com//blog/2015/02/01/refactor-broadcast-feature/"/>
+    <updated>2015-02-01T21:16:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2015/02/01/refactor-broadcast-feature</id>
+    <content type="html"><![CDATA[<p>以前薄荷伙伴子系统的广播功能使用 redis 存储数据，随着时间推移数据积累，消耗内存十分严重，属于典型的 redis 误用。现在进行大幅重构，更改为 cache + storage 的存储方式，取消了 redis 存储。重构后，消耗资源大幅下降，性能上还有所改进。</p>
+
+<p>先说说广播功能特性。广播功能主要用于薄荷向全体用法传递的消息（包括各种广告，告示和提醒等），当系统管理员在后台发出一条广播后，用户 app 上的消息图标显示小红点，当用户点击图标进入广播列表查看消息内容后，小红点消除。</p>
+
+<p>重构前，广播功能采用了 redis 存储方案，为每一位用户建立一个已读广播集合 set，该 set 中存放用户已读的广播 id。最常见的操作是获取某位用户未读广播和数量，其方法是：使用全体 广播 id 集合与已读广播 id 集合比较，差异部分就是未读广播，对其计数得到未读广播数量。</p>
+
+<p>这种方法的问题有两个：一是 redis 消耗内存巨大，随着用户数增加和发送广播数量增加，内存一直累积；二是当广播数量增加到比较大的数量后，获取未读广播很慢。</p>
+
+<p>对其重构如下：去除了 redis 存储，在数据库中存储每一个用户最新访问广播的时间 last_read_time，建立一个全体的广播列表缓存，广播列表只存放广播 id 和 created_time，列表根据 created_time 从新到旧排序。获取某个用户未读广播和其数量方法：把广播列表缓存的生成时间 created_time 和用户的 last_read_time 比较，比 last_read_time 大的属于未读广播，比 last_read_time 小的属于已读广播。</p>
+
+<p>这次重构，去除 redis 存储，大幅减少内存使用，算法调整让常见操作速度更快，效果很棒。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[使用 Redis 进行唯一计数的 3 种方法]]></title>
@@ -198,43 +217,6 @@ hash value: view count (integer)
 <p>另一种是 AppendOnly 机制。这种方式类似于 log，把数据操作命令全部存入 log 文件。优点是每段时间写入数据不是很大，可以设置很短的写入时间间隔（比如1秒钟）。缺点是 log 文件可能会远大于数据文件，通常会是数据文件大小的 3~5 倍，而且恢复的时间要远大于 RDB 方式的恢复时间。</p>
 
 <p>这两种机制各有优劣，不过它们是可以结合起来使用的。在实际使用过程，通常还结合 Redis 的 slave 功能，做到对 Redis 影响更小，保护更充分。具体的做法是对 Redis 建立 master 和 slave，在 master 上根本不使用任何持久化机制，只在 slave 上建立结合 RDB 和 AppendOnly 的持久化机制。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[分割 Redis 实例]]></title>
-    <link href="http://xiewenwei.github.com//blog/2014/06/08/sharding-redis-instance/"/>
-    <updated>2014-06-08T23:59:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2014/06/08/sharding-redis-instance</id>
-    <content type="html"><![CDATA[<p>薄荷 App 上的伙伴功能大量使用了内存数据库 Redis，随着数据量的快速增长，Redis 膨胀得很快，已经接近 12 GB规模，这些数据全部放在单个 Redis 实例中。单个巨大 Redis 实例有如下几个坏处：</p>
-
-<ol>
-<li><p>首先，需要一台内存很大的机器。Redis 是内存数据库，它需要把所有需求全部放在内存中，需要为之装下 12 GB的 Redis 实例，至少需要 12 GB 内存大小的机器，考虑的预留增长空间，一般需要 12 * 1.5 约 18 GB 内存。 另外还有一个考虑的因素是，Redis 进行硬盘数据存储时，fork 进程需要消耗同样大小的内存，因此一个 12GB 的 redis 实例需要 32 GB左右的内存比较合适，这对机器提出了很高的要求，常常难以满足。</p></li>
-<li><p>然后，Redis 容易成为性能瓶颈。Redis 的并发模型是单进程单线程，它不能充分利用多核 CPU，在请求数很高，或者某一些请求处理比较慢时（比如一些大的数据排序），可能会成为系统的性能瓶颈。有方法可以缓解甚至这个问题，就是建立多个 Redis 实例，通过多个 Redis 连接来实现。</p></li>
-<li><p>另外，单个巨大的 Redis 实例也会增加数据管理难度，因为这么大的数据量，无论是复制，备份操作都比较慢，容易对线上系统造成冲击。</p></li>
-</ol>
-
-
-<p>因此，十分有必要把单个巨大的 Redis 实例分割成多个小的 Redis 实例。</p>
-
-<p>使用 Redis 的复制机制，可以在线平滑处理 Redis 实例分割，几乎不会对系统有很大的影响。</p>
-
-<p>分割的具体操作思路如下：</p>
-
-<ol>
-<li><p>首先，规划 Redis 分割策略，通常是基于业务划分，比如薄荷伙伴是基于业务分成 timeline, user_relationship, other 3个 Redis 实例。规划好之后，需要根据规划结果对应用程序中 Redis 程序代码做修改，通常是有一个统一的 Redis 链接修改为多个 Redis 连接，不同业务使用不同的连接。</p></li>
-<li><p>然后，通过 Redis 复制功能建立多个 Redis 副本，让不同 Redis 连接使用不同的 Redis 副本，在 Redis 副本中删除多余的数据。批量删除某个模式的 keys，可以使用下面的 shell 命令：
-<code>
-redis-cli KEYS "&lt;pattern&gt;" | xargs redis-cli DEL
-</code>
-<pattern> 改成实际的模式，如
-<code>
-redis-cli KEYS "user:*:followers" | xargs redis-cli DEL
-</code>
-表示删除 user followers 数据。</p></li>
-<li><p>最后通过来回切换并重启 Redis 实例达到完全分割 Redis 实例。</p></li>
-</ol>
-
 ]]></content>
   </entry>
   
