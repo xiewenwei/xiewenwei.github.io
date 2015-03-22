@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2015-02-01T21:48:08+08:00</updated>
+  <updated>2015-03-22T23:57:19+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -12,6 +12,93 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[ruby 中的 4 种相等性判断方法]]></title>
+    <link href="http://xiewenwei.github.com//blog/2015/03/22/four-equality-operations-in-ruby/"/>
+    <updated>2015-03-22T23:14:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2015/03/22/four-equality-operations-in-ruby</id>
+    <content type="html"><![CDATA[<p>很早就知道 ruby 有 4 中相等性判断方法，分别是：“==”，“===”，“equal?” 和 “eql?”，平常程序中都有使用，但是感觉对其缺乏深入理解，今天读 rails 部分源码的时候拿捏不定其中一个判断的意思，于是趁机深入研究了一番，总算觉得比较清楚了，今天做一下笔记，以作备忘。</p>
+
+<h2>“==” 最常见的相等性判断</h2>
+
+<p>“==” 使用最频繁，它通常用于对象的值相等性（语义相等）判断，在 Object 的方法定义中，“==” 比较两个对象的 object_id 是否一致，通常之类都会重新定义覆盖这个方法，通过比较内部值来判断对象是否相等。</p>
+
+<p>比如 ActiveRecord::Base 对 &#8220;==&#8221; 的定义</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">def</span> <span class="nf">==</span><span class="p">(</span><span class="n">comparison_object</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">super</span> <span class="o">||</span>
+</span><span class='line'>      <span class="n">comparison_object</span><span class="o">.</span><span class="n">instance_of?</span><span class="p">(</span><span class="nb">self</span><span class="o">.</span><span class="n">class</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
+</span><span class='line'>      <span class="nb">id</span><span class="o">.</span><span class="n">present?</span> <span class="o">&amp;&amp;</span>
+</span><span class='line'>      <span class="n">comparison_object</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="nb">id</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>通过 model 的 id 属性比较两个 ActiveRecord::Base 实例是否相等。</p>
+
+<h2>“===” 用于 case 语句的相容判断</h2>
+
+<p>“===” 主要用于 case 语句中对象的相容比较，看代码比较容易理解。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">def</span> <span class="nf">what_is</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">case</span> <span class="n">obj</span>
+</span><span class='line'>    <span class="k">when</span> <span class="sr">/abc/</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;include abc&quot;</span>
+</span><span class='line'>    <span class="k">when</span> <span class="mi">3</span><span class="o">.</span><span class="n">.</span><span class="mi">5</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;in 3..5&quot;</span>
+</span><span class='line'>    <span class="k">when</span> <span class="no">Symbol</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;It is a symbol&quot;</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;unkonwn&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="s2">&quot;abcde&quot;</span><span class="p">)</span> <span class="c1"># =&gt;  &quot;include abc&quot;</span>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>       <span class="c1"># =&gt;  &quot;in 3..5&quot;</span>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="ss">:a</span><span class="p">)</span>      <span class="c1"># =&gt;  &quot;It is a symbol&quot;</span>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>     <span class="c1"># =&gt;  &quot;unknown&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>case 背后是拿每一个 when 后面的对象与 obj 进行 === 方法计算，比如上面的代码就是
+分别求 <code>/abc/.===(obj)</code>，<code>(3..5).===(obj)</code>，<code>Symbol.===(obj)</code>。</p>
+
+<p>关键得看 <code>===</code> 方法里如何定义，<code>Class</code> 类中，<code>===</code> 定义为 obj.is_a?(klass)，所以 case 可以现实 obj 的类型判断。</p>
+
+<p>特别要注意的是和其他相等判断不同 “===” 通常没法交换，也就是很可能
+  a.===(b) != b.===(a) ，比如  /abc/ === &#8220;abcd&#8221; 为 true，但 &#8220;abcd&#8221; === /abc/ 为 false。</p>
+
+<h2>“equal?” 相同对象判断</h2>
+
+<p>“equal?” 其实是最简单的，但是也是最容易让人搞混的。说它简单是因为这个方法的语义是比较两个对象是否相同（是否有相同的 object_id），Object 的方法提供适用所有对象，不建议进行重写覆盖。说它容易让人搞混，是因为 ruby 和 java 中 “==” 和 &#8220;equal?&#8221; 方法的语义正好是相反的，ruby 中 “equal?” 表示对象引用相同，而 java 表示对象值相同。</p>
+
+<h2>“eql?” 对象 hash 值判断</h2>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[重构系统广播功能]]></title>
@@ -1681,46 +1768,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 <p>然后就可以通过 rake appraisal 完成多个 rails 版本测试，它的原理和上面提到的完全一样。</p>
 
 <p>总之，多 Ruby 版本和多 gem 版本的测试并不难，利用 rvm 和 bundle 一些特性可以快速做到，利用 appraisal 可以让其更简化。</p>
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[一种轻量的移动应用离线操作和数据同步策略]]></title>
-    <link href="http://xiewenwei.github.com//blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy/"/>
-    <updated>2013-06-03T22:58:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2013/06/03/a-lightweight-offline-operation-and-data-synchronization-policy</id>
-    <content type="html"><![CDATA[<p>对移动应用而言，离线操作和数据同步是一件烦人的事情，组合使用本地数据，远程数据缓存和服务请求暂存的策略，可以使之变得比较轻松简单。</p>
-
-
-
-
-<h2>使用本地数据</h2>
-
-
-
-
-<p>为了 app 在离线状态下部分功能依然能够使用，可以把部分数据直接和应用打包在一起发布。这样当应用检测到网络不通时，可以使用本地数据。比如对于食物查询功能，在网络通的时候是请求服务器完成查询的，当网络不通时，就使用本地的数据做查询。使用本地数据有两个制约，一是本地数据不能太大，太大的话应用打包后的体积会很大；二是本地数据的功能有所限制。比如对于食物查询而言，通过请求服务器完成时可以使用比较智能的搜索，使用本地查询的化就只能使用简单的文本匹配了。所以在离线操作时，需要提示用户使用的是本地数据，功能所限，联网使用的话才能使用完整功能。</p>
-
-
-
-
-<h2>远程数据缓存</h2>
-
-
-
-
-<p>因为本地数据有很多限制，数量不全，然后内容也不全，使用远程数据缓存可以减轻本地数据的限制。比如，食物数据只包括了最基本的名称和单位热量数据，没有包括额外的介绍、评价等数据。但是用户已经查询的食物数据可以缓存起来，离线操作查询的时候也可以显示这些信息。另外，缓存数据的一大好处是能大幅提高应用的性能。毕竟大部分操作是以读为主的，数据的变化也不是很频繁，如果利用缓存的话，能够大幅减少请求次数和网络带宽。</p>
-
-
-
-
-<h2>暂存数据操作请求</h2>
-
-
-
-
-<p>对于写请求的操作，在离线的时候，可以简单的把整个请求 URL 和 参数先保存起来，等到网络通了只会，再依次按顺序发送给服务器完成操作。这种方法，对比应用和服务器之间互相跟踪数据变化记录，然后根据变化记录操作数据的方法，要简单得多，而且如果中间出现问题，故障处理也要简单可靠的多。</p>
-
 ]]></content>
   </entry>
   

@@ -1,0 +1,311 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>ruby 中的 4 种相等性判断方法 - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="很早就知道 ruby 有 4 中相等性判断方法，分别是：“==”，“===”，“equal?” 和 “eql?”，平常程序中都有使用，但是感觉对其缺乏深入理解，今天读 rails 部分源码的时候拿捏不定其中一个判断的意思，于是趁机深入研究了一番，总算觉得比较清楚了，今天做一下笔记，以作备忘 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2015/03/22/four-equality-operations-in-ruby/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">ruby 中的 4 种相等性判断方法</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-03-22T23:14:00+08:00" pubdate data-updated="true">2015-03-22</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>很早就知道 ruby 有 4 中相等性判断方法，分别是：“==”，“===”，“equal?” 和 “eql?”，平常程序中都有使用，但是感觉对其缺乏深入理解，今天读 rails 部分源码的时候拿捏不定其中一个判断的意思，于是趁机深入研究了一番，总算觉得比较清楚了，今天做一下笔记，以作备忘。</p>
+
+<h2>“==” 最常见的相等性判断</h2>
+
+<p>“==” 使用最频繁，它通常用于对象的值相等性（语义相等）判断，在 Object 的方法定义中，“==” 比较两个对象的 object_id 是否一致，通常之类都会重新定义覆盖这个方法，通过比较内部值来判断对象是否相等。</p>
+
+<p>比如 ActiveRecord::Base 对 &#8220;==&#8221; 的定义</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">def</span> <span class="nf">==</span><span class="p">(</span><span class="n">comparison_object</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">super</span> <span class="o">||</span>
+</span><span class='line'>      <span class="n">comparison_object</span><span class="o">.</span><span class="n">instance_of?</span><span class="p">(</span><span class="nb">self</span><span class="o">.</span><span class="n">class</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
+</span><span class='line'>      <span class="nb">id</span><span class="o">.</span><span class="n">present?</span> <span class="o">&amp;&amp;</span>
+</span><span class='line'>      <span class="n">comparison_object</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="nb">id</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>通过 model 的 id 属性比较两个 ActiveRecord::Base 实例是否相等。</p>
+
+<h2>“===” 用于 case 语句的相容判断</h2>
+
+<p>“===” 主要用于 case 语句中对象的相容比较，看代码比较容易理解。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">def</span> <span class="nf">what_is</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">case</span> <span class="n">obj</span>
+</span><span class='line'>    <span class="k">when</span> <span class="sr">/abc/</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;include abc&quot;</span>
+</span><span class='line'>    <span class="k">when</span> <span class="mi">3</span><span class="o">.</span><span class="n">.</span><span class="mi">5</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;in 3..5&quot;</span>
+</span><span class='line'>    <span class="k">when</span> <span class="no">Symbol</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;It is a symbol&quot;</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>      <span class="nb">puts</span> <span class="s2">&quot;unkonwn&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="s2">&quot;abcde&quot;</span><span class="p">)</span> <span class="c1"># =&gt;  &quot;include abc&quot;</span>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>       <span class="c1"># =&gt;  &quot;in 3..5&quot;</span>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="ss">:a</span><span class="p">)</span>      <span class="c1"># =&gt;  &quot;It is a symbol&quot;</span>
+</span><span class='line'><span class="n">what_is</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>     <span class="c1"># =&gt;  &quot;unknown&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>case 背后是拿每一个 when 后面的对象与 obj 进行 === 方法计算，比如上面的代码就是
+分别求 <code>/abc/.===(obj)</code>，<code>(3..5).===(obj)</code>，<code>Symbol.===(obj)</code>。</p>
+
+<p>关键得看 <code>===</code> 方法里如何定义，<code>Class</code> 类中，<code>===</code> 定义为 obj.is_a?(klass)，所以 case 可以现实 obj 的类型判断。</p>
+
+<p>特别要注意的是和其他相等判断不同 “===” 通常没法交换，也就是很可能
+  a.===(b) != b.===(a) ，比如  /abc/ === &#8220;abcd&#8221; 为 true，但 &#8220;abcd&#8221; === /abc/ 为 false。</p>
+
+<h2>“equal?” 相同对象判断</h2>
+
+<p>“equal?” 其实是最简单的，但是也是最容易让人搞混的。说它简单是因为这个方法的语义是比较两个对象是否相同（是否有相同的 object_id），Object 的方法提供适用所有对象，不建议进行重写覆盖。说它容易让人搞混，是因为 ruby 和 java 中 “==” 和 &#8220;equal?&#8221; 方法的语义正好是相反的，ruby 中 “equal?” 表示对象引用相同，而 java 表示对象值相同。</p>
+
+<h2>“eql?” 对象 hash 值判断</h2>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-03-22T23:14:00+08:00" pubdate data-updated="true">2015-03-22</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/ruby/'>ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2015/02/01/refactor-broadcast-feature/" title="Previous Post: 重构系统广播功能">&laquo; 重构系统广播功能</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/03/22/four-equality-operations-in-ruby/">ruby 中的 4 种相等性判断方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/02/01/refactor-broadcast-feature/">重构系统广播功能</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">Rails 中 mattr_accessor 一处文档错误</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数的 3 种方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2015 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2015/03/22/four-equality-operations-in-ruby/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2015/03/22/four-equality-operations-in-ruby/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>
