@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="很早就知道 ruby 有 4 种相等性判断方法，分别是：“==”，“===”，“equal?” 和 “eql?”，平常程序中都有使用，但是感觉对其缺乏深入理解，今天读 rails 部分源码的时候拿捏不定其中一个判断的意思，于是趁机深入研究了一番，总算觉得比较清楚了，今天做一下笔记，以作备忘 &hellip;">
+  <meta name="description" content="缓存是提升系统性能非常有效的手段，常常起到立竿见影的效果，但是有时不恰当的使用不但起不到优化效果，反而可能让系统更慢。下面总结缓存使用过程中常见的一些陷阱。 大家应该比较熟悉数据库查询时的 N+1 问题，在缓存中同样存在 N+1 问题。当应用中出现需要多次读取缓存的时候，虽然单次读取缓存速度很快， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,182 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2015-05-27T17:43:00+08:00" pubdate data-updated="true">2015-05-27</time>
+        
+         | <a href="/blog/2015/05/27/cache-trap/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>缓存是提升系统性能非常有效的手段，常常起到立竿见影的效果，但是有时不恰当的使用不但起不到优化效果，反而可能让系统更慢。下面总结缓存使用过程中常见的一些陷阱。</p>
+
+<hr />
+
+<p>大家应该比较熟悉数据库查询时的 N+1 问题，在缓存中同样存在 N+1 问题。当应用中出现需要多次读取缓存的时候，虽然单次读取缓存速度很快，但是多次读取缓存累计时间相当可观，很可能会成为一个性能瓶颈。</p>
+
+<p>直接给一个演示例子，生成 10000 个缓存对象 user:<i>:counter 存储整数，然后分别单次，批量读取缓存，统计每种方式消耗时间。</p>
+
+<p>代码如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">n</span> <span class="o">=</span> <span class="mi">10000</span>
+</span><span class='line'><span class="n">n</span><span class="o">.</span><span class="n">times</span> <span class="p">{</span><span class="o">|</span><span class="n">i</span><span class="o">|</span> <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">write</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">i</span><span class="si">}</span><span class="s2">:counter&quot;</span><span class="p">,</span> <span class="n">i</span> <span class="o">*</span> <span class="n">i</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">read_by_batch</span><span class="p">(</span><span class="n">total</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">)</span>
+</span><span class='line'>  <span class="n">array</span> <span class="o">=</span> <span class="o">[]</span>
+</span><span class='line'>  <span class="n">total</span><span class="o">.</span><span class="n">times</span> <span class="k">do</span> <span class="o">|</span><span class="n">i</span><span class="o">|</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">%</span> <span class="n">batch_size</span> <span class="o">==</span> <span class="mi">0</span>
+</span><span class='line'>      <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">read_multi</span> <span class="o">*</span><span class="n">array</span>
+</span><span class='line'>      <span class="n">array</span> <span class="o">=</span> <span class="o">[]</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>      <span class="n">array</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">i</span><span class="si">}</span><span class="s2">:counter&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="no">Benchmark</span><span class="o">.</span><span class="n">bm</span> <span class="k">do</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot;  1&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">n</span><span class="o">.</span><span class="n">times</span> <span class="k">do</span> <span class="o">|</span><span class="n">i</span><span class="o">|</span>
+</span><span class='line'>      <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">read</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">i</span><span class="si">}</span><span class="s2">:counter&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot; 10&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">10</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot; 30&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">30</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot; 50&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">50</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot;100&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">100</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>执行结果如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>   user     system      total        real
+</span><span class='line'>  1  0.910000   0.210000   1.120000 <span class="o">(</span>  1.316800<span class="o">)</span>
+</span><span class='line'> 10  0.010000   0.000000   0.010000 <span class="o">(</span>  0.013985<span class="o">)</span>
+</span><span class='line'> 30  0.010000   0.000000   0.010000 <span class="o">(</span>  0.009109<span class="o">)</span>
+</span><span class='line'> 50  0.010000   0.000000   0.010000 <span class="o">(</span>  0.009200<span class="o">)</span>
+</span><span class='line'>100  0.040000   0.010000   0.050000 <span class="o">(</span>  0.044768<span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>从结果中可以看到，分批读取（每次 30~50时）速度很快，要比每次 1 个对象快 100 多倍，每次读取 10 个对象也要快 100 倍，批次并不是越大越好，每次读取 100 个速度比 10 个更慢。</p>
+
+<p>在薄荷生产系统性能优化中，我们遇到过好几次类似的问题。例如有一个 api 需要返回多个存放缓存的用户资料，单个用户资料缓存读取时间接近 1 ms，50 个用户资料消耗接近 45 ms 时间，它导致这个 api 响应时间很长，把 50 次用户资料缓存读取放到一次批量读取后，缓存读取时间减少为 3 ms 左右，应用性能立即大幅提升。</p>
+
+<p>为什么批量读取时间消耗大幅减少呢？因为每一次缓存读取过程有很多固定开销，包括加锁，系统（网络）调用等等，当使用批量读取时，这些固定开销统统节省了，而缓存服务器单次 key 查找和数据返回消耗时间差别不大，所以整体时间大幅减少。</p>
+
+<p>当然，批量读取增加了应用的复杂度，如果应用性能没有问题，或者缓存读取次数很少，并没有必要改造成批量读取形式。</p>
+
+<p>最后一点是，通常我们以 fetch 方法使用缓存对象，这时批量读取方法如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">keys</span> <span class="o">=</span> <span class="n">user_ids</span><span class="o">.</span><span class="n">map</span> <span class="p">{</span> <span class="o">|</span><span class="n">user_id</span><span class="o">|</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">user_id</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">user_hash</span> <span class="o">=</span> <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">fetch_multi</span><span class="p">(</span><span class="o">*</span><span class="n">keys</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
+</span><span class='line'>    <span class="no">User</span><span class="o">.</span><span class="n">find_by_id</span> <span class="n">key</span><span class="o">.</span><span class="n">gsub</span><span class="p">(</span><span class="s1">&#39;user:&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>总结：缓存虽然很快，但它毕竟也是一次 IO 操作，同样需要消耗一定时间，如果某一次特别大量读写缓存，很可能会以前性能问题，通过批量读取方式是解决该问题的有效手段。</p>
+
+<p>这是“缓存使用陷阱”系列文章的第 1 篇，接下来还会带来：
+* 2. 空数据导致缓存失效
+* 3. 缓存大量无用数据导致内存浪费
+* 4. 过度使用缓存
+* 5. 把缓存当成存储使用导致数据丢失</p>
+
+<p>希望分享薄荷系统中遇到并解决的一些问题，能够对大家有所帮助。
+薄荷正在招聘 ruby 伙伴，有兴趣请看 https://ruby-china.org/topics/25585 。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -918,113 +1094,6 @@ diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &l
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/08/03/dig-into-git-object-model/">实例探索 Git 对象模型</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-08-03T18:48:00+08:00" pubdate data-updated="true">2014-08-03</time>
-        
-         | <a href="/blog/2014/08/03/dig-into-git-object-model/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>一个纯研究演示 Git 对象模型的项目，项目在  https://github.com/xiewenwei/dig-git，总共有 5 次 commit（包括一次 merge），都是很简单的内容，我们可以仔细观察一下每一 commit 之后 Git 对象模型图，以此分析 Git 存储的原理。</p>
-
-<ul>
-<li><ol>
-<li>首次提交，提交一个简单的文件 a.txt ，commit 之后的图如下：</li>
-</ol>
-</li>
-</ul>
-
-
-<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/9c44291362d64765803afba65fa2a0a4.png" alt="" /></p>
-
-<p>如图所示，生成了 3 个对象，一个 commit 对象，一个 tree 对象，一个 blob 对象。图上蓝底是 commit 对象，灰底的是 tree 对象，白底的是 blob 对象，每个对象节点的标题是对象的 key (SHA 摘要)缩略表示。
-对于 commit 对象，tree 内容表示这个 commit 对应根目录的 tree 对象，parent 表示父 commit 节点，通常commit 只有一个父节点，也可能没有（首次提交时 parent 为空），也可能有多个（合并节点），commit 对象还保存了 commit message 等信息。
-对于 tree 对象，里面的内容包含了文件名，文件对应的 blob 对象的 key，或者是目录名和目录对应 tree 对象的 key。
-对于 blob 对象，表示一个实际文件对象的内容，但不包括文件名，文件名是在 tree 对象里存的。</p>
-
-<p>这个图怎么得到的呢？主要是两个命令：
-* 通过 <code>git log</code> 命令获取最新 commit 的 key
-* 通过 <code>git cat-file -p &lt;object key&gt;</code>  获取 key 对应 object 的内容，根据 object 里的内容，继续探索，就可以访问到所有关联 object.</p>
-
-<ul>
-<li><ol>
-<li>第 2 次提交，修改了 a.txt 文件：</li>
-</ol>
-</li>
-</ul>
-
-
-<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/ba84d2ce8ba5066444a3e382ed644206.png" alt="" /></p>
-
-<p>因为 a.txt 文件已经修改，生成了一个新的 blob 对象，tree 对象和 commit 对象。如图所示，commit 对象之间是有关联的，新提交的 commit 对象的 parent 是上一次提交的 commit 对象。</p>
-
-<ul>
-<li><ol>
-<li>第 3 次提交，这次已稍微复杂一点，增加一个新文件 b.txt ，一个新目录 lib ，lib 里增加一个文件 c.txt</li>
-</ol>
-</li>
-</ul>
-
-
-<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/1ab7f0d2ab24734f0af6fc2d8e7c7a7d.png" alt="" /></p>
-
-<p>如图所示，目录是有一个 tree 对象表示的，里面的内容指明了目录包含的文件或子目录。</p>
-
-<ul>
-<li><ol>
-<li>第 4 次提交，这次弄出一个新的分支 test1，并且在新分支中做了一次 commit</li>
-</ol>
-</li>
-</ul>
-
-
-<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/8378188d524614d5b12bc27c42404a24.png" alt="" /></p>
-
-<p>0c5ca 对应的 commit 对象就是生成的分支 test1 中的。分支在 Git 中是一个非常轻量化的操作，建立分支甚至都不增加新的对象。</p>
-
-<ul>
-<li><ol>
-<li>第 5 次提交，这次涉及到一个合并操作，图已经变得比较复杂了</li>
-</ol>
-</li>
-</ul>
-
-
-<p><img src="https://ruby-china-files.b0.upaiyun.com/photo/2014/8e555b42a9775d725bd95ee7f369af7c.png" alt="" /></p>
-
-<p>def18 就是合并后的 commit 对象。合并生成了一个新的commit ，这个 commit 的 parent 有两个，指向合并的两个原分支对应的 commit 上。</p>
-
-<p>抱歉没有写得很详细，恐怕需要自己参照例子试试一看看，搞明白这些图，也就能搞明白整个 Git 对象模型机制了。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1038,6 +1107,10 @@ diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &l
     <section>
   <h1>Recent Posts</h1>
   <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题</a>
+      </li>
     
       <li class="post">
         <a href="/blog/2015/03/22/four-equality-operations-in-ruby/">ruby 中的 4 种相等性判断方法</a>
@@ -1055,10 +1128,6 @@ diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &l
         <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数的 3 种方法</a>
       </li>
     
-      <li class="post">
-        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
-      </li>
-    
   </ul>
 </section>
 
@@ -1073,7 +1142,7 @@ diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &l
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2015 - vincent -
+  Copyright &copy; 2016 - vincent -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 

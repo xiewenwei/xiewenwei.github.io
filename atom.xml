@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2015-03-23T00:13:06+08:00</updated>
+  <updated>2016-02-21T22:00:43+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -12,6 +12,153 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题]]></title>
+    <link href="http://xiewenwei.github.com//blog/2015/05/27/cache-trap/"/>
+    <updated>2015-05-27T17:43:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2015/05/27/cache-trap</id>
+    <content type="html"><![CDATA[<p>缓存是提升系统性能非常有效的手段，常常起到立竿见影的效果，但是有时不恰当的使用不但起不到优化效果，反而可能让系统更慢。下面总结缓存使用过程中常见的一些陷阱。</p>
+
+<hr />
+
+<p>大家应该比较熟悉数据库查询时的 N+1 问题，在缓存中同样存在 N+1 问题。当应用中出现需要多次读取缓存的时候，虽然单次读取缓存速度很快，但是多次读取缓存累计时间相当可观，很可能会成为一个性能瓶颈。</p>
+
+<p>直接给一个演示例子，生成 10000 个缓存对象 user:<i>:counter 存储整数，然后分别单次，批量读取缓存，统计每种方式消耗时间。</p>
+
+<p>代码如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">n</span> <span class="o">=</span> <span class="mi">10000</span>
+</span><span class='line'><span class="n">n</span><span class="o">.</span><span class="n">times</span> <span class="p">{</span><span class="o">|</span><span class="n">i</span><span class="o">|</span> <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">write</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">i</span><span class="si">}</span><span class="s2">:counter&quot;</span><span class="p">,</span> <span class="n">i</span> <span class="o">*</span> <span class="n">i</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">read_by_batch</span><span class="p">(</span><span class="n">total</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">)</span>
+</span><span class='line'>  <span class="n">array</span> <span class="o">=</span> <span class="o">[]</span>
+</span><span class='line'>  <span class="n">total</span><span class="o">.</span><span class="n">times</span> <span class="k">do</span> <span class="o">|</span><span class="n">i</span><span class="o">|</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">%</span> <span class="n">batch_size</span> <span class="o">==</span> <span class="mi">0</span>
+</span><span class='line'>      <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">read_multi</span> <span class="o">*</span><span class="n">array</span>
+</span><span class='line'>      <span class="n">array</span> <span class="o">=</span> <span class="o">[]</span>
+</span><span class='line'>    <span class="k">else</span>
+</span><span class='line'>      <span class="n">array</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">i</span><span class="si">}</span><span class="s2">:counter&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="no">Benchmark</span><span class="o">.</span><span class="n">bm</span> <span class="k">do</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot;  1&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">n</span><span class="o">.</span><span class="n">times</span> <span class="k">do</span> <span class="o">|</span><span class="n">i</span><span class="o">|</span>
+</span><span class='line'>      <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">read</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">i</span><span class="si">}</span><span class="s2">:counter&quot;</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot; 10&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">10</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot; 30&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">30</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot; 50&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">50</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">x</span><span class="o">.</span><span class="n">report</span> <span class="s2">&quot;100&quot;</span> <span class="k">do</span>
+</span><span class='line'>    <span class="n">read_by_batch</span> <span class="n">n</span><span class="p">,</span> <span class="mi">100</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>执行结果如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>   user     system      total        real
+</span><span class='line'>  1  0.910000   0.210000   1.120000 <span class="o">(</span>  1.316800<span class="o">)</span>
+</span><span class='line'> 10  0.010000   0.000000   0.010000 <span class="o">(</span>  0.013985<span class="o">)</span>
+</span><span class='line'> 30  0.010000   0.000000   0.010000 <span class="o">(</span>  0.009109<span class="o">)</span>
+</span><span class='line'> 50  0.010000   0.000000   0.010000 <span class="o">(</span>  0.009200<span class="o">)</span>
+</span><span class='line'>100  0.040000   0.010000   0.050000 <span class="o">(</span>  0.044768<span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>从结果中可以看到，分批读取（每次 30~50时）速度很快，要比每次 1 个对象快 100 多倍，每次读取 10 个对象也要快 100 倍，批次并不是越大越好，每次读取 100 个速度比 10 个更慢。</p>
+
+<p>在薄荷生产系统性能优化中，我们遇到过好几次类似的问题。例如有一个 api 需要返回多个存放缓存的用户资料，单个用户资料缓存读取时间接近 1 ms，50 个用户资料消耗接近 45 ms 时间，它导致这个 api 响应时间很长，把 50 次用户资料缓存读取放到一次批量读取后，缓存读取时间减少为 3 ms 左右，应用性能立即大幅提升。</p>
+
+<p>为什么批量读取时间消耗大幅减少呢？因为每一次缓存读取过程有很多固定开销，包括加锁，系统（网络）调用等等，当使用批量读取时，这些固定开销统统节省了，而缓存服务器单次 key 查找和数据返回消耗时间差别不大，所以整体时间大幅减少。</p>
+
+<p>当然，批量读取增加了应用的复杂度，如果应用性能没有问题，或者缓存读取次数很少，并没有必要改造成批量读取形式。</p>
+
+<p>最后一点是，通常我们以 fetch 方法使用缓存对象，这时批量读取方法如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="n">keys</span> <span class="o">=</span> <span class="n">user_ids</span><span class="o">.</span><span class="n">map</span> <span class="p">{</span> <span class="o">|</span><span class="n">user_id</span><span class="o">|</span> <span class="s2">&quot;user:</span><span class="si">#{</span><span class="n">user_id</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">user_hash</span> <span class="o">=</span> <span class="no">Rails</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">fetch_multi</span><span class="p">(</span><span class="o">*</span><span class="n">keys</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
+</span><span class='line'>    <span class="no">User</span><span class="o">.</span><span class="n">find_by_id</span> <span class="n">key</span><span class="o">.</span><span class="n">gsub</span><span class="p">(</span><span class="s1">&#39;user:&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>总结：缓存虽然很快，但它毕竟也是一次 IO 操作，同样需要消耗一定时间，如果某一次特别大量读写缓存，很可能会以前性能问题，通过批量读取方式是解决该问题的有效手段。</p>
+
+<p>这是“缓存使用陷阱”系列文章的第 1 篇，接下来还会带来：
+* 2. 空数据导致缓存失效
+* 3. 缓存大量无用数据导致内存浪费
+* 4. 过度使用缓存
+* 5. 把缓存当成存储使用导致数据丢失</p>
+
+<p>希望分享薄荷系统中遇到并解决的一些问题，能够对大家有所帮助。
+薄荷正在招聘 ruby 伙伴，有兴趣请看 https://ruby-china.org/topics/25585 。</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[ruby 中的 4 种相等性判断方法]]></title>
@@ -1718,67 +1865,6 @@ UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
 <li><a href="http://tenderlovemaking.com/2012/06/18/removing-config-threadsafe.html/">http://tenderlovemaking.com/2012/06/18/removing-config-threadsafe.html/</a></li>
 </ul>
 
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[多 Ruby 版本和 多 Gem 版本测试]]></title>
-    <link href="http://xiewenwei.github.com//blog/2014/01/05/multiple-rubies-and-gems-test-solution/"/>
-    <updated>2014-01-05T22:58:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2014/01/05/multiple-rubies-and-gems-test-solution</id>
-    <content type="html"><![CDATA[<p>admin_gateway 是用于我们所有后台统一认证和授权的组件，而我们后台程序运行在多个 Ruby 版本上，主要是 Ruby 1.9.3 和 2.0，Ruby 2.1 也已经发布了，很快也需要提供 Ruby 2.1 的支持，另外 Rails 版本有 3.0，3.2 和 4.0 三大主要版本，因此一个完整的测试方案是需要包括这 3 * 3 = 9 种组合才行。</p>
-
-<p>首先是多个 Ruby 版本测试。这个问题比较简单，我们现在的 Ruby 环境通常是由 RVM 管理的，RVM 可以很容易的以多个 Ruby 版本重复执行 Ruby 程序，比如下面的例子：
-<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec ruby -e "puts RUBY_VERSION"</code>
-如果运行的机器安装了这3个版本的 Ruby 的话，就会依次执行打出各自的 Ruby 版本号。
-所以下面的命令就可以依次运行3个Ruby版本的测试了：</p>
-
-<p><code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install</code>
-<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code></p>
-
-<p>解决多 Ruby 版本测试的问题，然后就是多 Rails 版本测试的问题。admin_gateway 这个 gem 是一个 Rails Engine，因此需要依赖 Rails。多 Rails 版本测试意味着 test 的 gem 环境是不同的，而现在 gem 环境是由 bundle 管理的，运行 bundle 命令时可以手动指定 Gemfile 文件，因此 建立多个 Gemfile 文件，重复上面的命令就可以了，例如可以建立 rails_4_0.gemfile 这个 Gemfile，然后通过命令
-<code>bundle install --gemfile rails_4_0.gemfile</code>
-执行 gem 环境安装，
-然后通过命令：
-<code>BUNDLE_GEMFILE=rails_4_0.gemfile bundle exec rake test</code>
-执行测试。</p>
-
-<p>组合上面的方法，可以形成一个完整的多 Ruby 版本和 Rails 版本的解决方案：
-1. 首先根据需要安装多个 Ruby 版本，如 ruby 1.9.3, 2.0.0 和 2.1.0，根据需要生成多个 gemfile，如 rails_3_0.gemfile, rails_3_2.gemfile 和 rails_4_0.gemfile
-2. 然后使用下面的 shell 安装 gem 环境和运行测试。
-<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install --gemfile=rails_3_0.gemfile</code>
-<code>BUNDLE_GEMFILE=rails_3_0.gemfile rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code>
-3.2 和 4.0的类似，就不重复了。</p>
-
-<p>解决 gem 多版本的方法有一点不干净，因为 gemfile 有很多重复内容，shell命令也比较重复，因此有一个 gem 叫 appraise （https://github.com/cfedermann/Appraise）就是用于解决这个问题，它只需要配置一个 Appraisals 文件，在 Appraisals 声明不同的 gem 依赖就可以了，比如 admin_gateway 的 Appraisals 内容如下：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>appraise "rails-3-0" do
-</span><span class='line'>  gem "rails", "3.0.20"
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>appraise "rails-3-2" do
-</span><span class='line'>  gem "rails", "3.2.16"
-</span><span class='line'>end
-</span><span class='line'>
-</span><span class='line'>appraise "rails-4-0" do
-</span><span class='line'>  gem "rails", "4.0.0"
-</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
-
-
-<p>然后就可以通过 rake appraisal 完成多个 rails 版本测试，它的原理和上面提到的完全一样。</p>
-
-<p>总之，多 Ruby 版本和多 gem 版本的测试并不难，利用 rvm 和 bundle 一些特性可以快速做到，利用 appraisal 可以让其更简化。</p>
 ]]></content>
   </entry>
   

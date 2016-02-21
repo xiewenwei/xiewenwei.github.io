@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="对移动应用而言，离线操作和数据同步是一件烦人的事情，组合使用本地数据，远程数据缓存和服务请求暂存的策略，可以使之变得比较轻松简单。 使用本地数据 为了 app 在离线状态下部分功能依然能够使用，可以把部分数据直接和应用打包在一起发布。这样当应用检测到网络不通时，可以使用本地数据。 &hellip;">
+  <meta name="description" content="admin_gateway 是用于我们所有后台统一认证和授权的组件，而我们后台程序运行在多个 Ruby 版本上，主要是 Ruby 1.9.3 和 2.0，Ruby 2.1 也已经发布了，很快也需要提供 Ruby 2.1 的支持，另外 Rails 版本有 3.0，3.2 和 4.0 三大主要版本， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +68,96 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2014/01/05/multiple-rubies-and-gems-test-solution/">多 Ruby 版本和 多 Gem 版本测试</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2014-01-05T22:58:00+08:00" pubdate data-updated="true">2014-01-05</time>
+        
+         | <a href="/blog/2014/01/05/multiple-rubies-and-gems-test-solution/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>admin_gateway 是用于我们所有后台统一认证和授权的组件，而我们后台程序运行在多个 Ruby 版本上，主要是 Ruby 1.9.3 和 2.0，Ruby 2.1 也已经发布了，很快也需要提供 Ruby 2.1 的支持，另外 Rails 版本有 3.0，3.2 和 4.0 三大主要版本，因此一个完整的测试方案是需要包括这 3 * 3 = 9 种组合才行。</p>
+
+<p>首先是多个 Ruby 版本测试。这个问题比较简单，我们现在的 Ruby 环境通常是由 RVM 管理的，RVM 可以很容易的以多个 Ruby 版本重复执行 Ruby 程序，比如下面的例子：
+<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec ruby -e "puts RUBY_VERSION"</code>
+如果运行的机器安装了这3个版本的 Ruby 的话，就会依次执行打出各自的 Ruby 版本号。
+所以下面的命令就可以依次运行3个Ruby版本的测试了：</p>
+
+<p><code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install</code>
+<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code></p>
+
+<p>解决多 Ruby 版本测试的问题，然后就是多 Rails 版本测试的问题。admin_gateway 这个 gem 是一个 Rails Engine，因此需要依赖 Rails。多 Rails 版本测试意味着 test 的 gem 环境是不同的，而现在 gem 环境是由 bundle 管理的，运行 bundle 命令时可以手动指定 Gemfile 文件，因此 建立多个 Gemfile 文件，重复上面的命令就可以了，例如可以建立 rails_4_0.gemfile 这个 Gemfile，然后通过命令
+<code>bundle install --gemfile rails_4_0.gemfile</code>
+执行 gem 环境安装，
+然后通过命令：
+<code>BUNDLE_GEMFILE=rails_4_0.gemfile bundle exec rake test</code>
+执行测试。</p>
+
+<p>组合上面的方法，可以形成一个完整的多 Ruby 版本和 Rails 版本的解决方案：
+1. 首先根据需要安装多个 Ruby 版本，如 ruby 1.9.3, 2.0.0 和 2.1.0，根据需要生成多个 gemfile，如 rails_3_0.gemfile, rails_3_2.gemfile 和 rails_4_0.gemfile
+2. 然后使用下面的 shell 安装 gem 环境和运行测试。
+<code>rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle install --gemfile=rails_3_0.gemfile</code>
+<code>BUNDLE_GEMFILE=rails_3_0.gemfile rvm ruby-1.9.3,ruby-2.0.0,ruby-2.1.0 exec bundle exec rake test</code>
+3.2 和 4.0的类似，就不重复了。</p>
+
+<p>解决 gem 多版本的方法有一点不干净，因为 gemfile 有很多重复内容，shell命令也比较重复，因此有一个 gem 叫 appraise （https://github.com/cfedermann/Appraise）就是用于解决这个问题，它只需要配置一个 Appraisals 文件，在 Appraisals 声明不同的 gem 依赖就可以了，比如 admin_gateway 的 Appraisals 内容如下：</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>appraise "rails-3-0" do
+</span><span class='line'>  gem "rails", "3.0.20"
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>appraise "rails-3-2" do
+</span><span class='line'>  gem "rails", "3.2.16"
+</span><span class='line'>end
+</span><span class='line'>
+</span><span class='line'>appraise "rails-4-0" do
+</span><span class='line'>  gem "rails", "4.0.0"
+</span><span class='line'>end</span></code></pre></td></tr></table></div></figure>
+
+
+<p>然后就可以通过 rake appraisal 完成多个 rails 版本测试，它的原理和上面提到的完全一样。</p>
+
+<p>总之，多 Ruby 版本和多 gem 版本的测试并不难，利用 rvm 和 bundle 一些特性可以快速做到，利用 appraisal 可以让其更简化。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -1756,267 +1846,6 @@ CK 在 A 可以找到，CT 在 A 和 B 都找不到。</p>
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2012/11/12/ruby-block-proc-and-lambda/">Ruby: block proc and lambda</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2012-11-12T14:12:00+08:00" pubdate data-updated="true">2012-11-12</time>
-        
-         | <a href="/blog/2012/11/12/ruby-block-proc-and-lambda/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>在规则引擎中，Ruby 的闭包使用特别频繁，而且有 block，Proc和 lambda 等后几种形式的用法，很让人困惑。为了深入理解代码，再次认真学习了一下 Ruby 的闭包，特别是 block，proc 和 lambda 几种用法的异同，这次的周记就和大家分享一下心得。</p>
-
-<p>闭包是 Ruby 相对其它语言特别优势之一，很多语言有闭包，但是唯有 Ruby 把闭包的优势发挥得淋漓尽致。Ruby 的哲学之一：同一个问题现实中有多种解决方法，所以 Ruby 中也有多种解法，所以闭包的使用也有多种方法。</p>
-
-<p>先看一个代码的例子：
-Example 1:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">def</span> <span class="nf">foo1</span>
-</span><span class='line'>  <span class="k">yield</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="k">def</span> <span class="nf">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
-</span><span class='line'>  <span class="n">b</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="n">b</span>
-</span><span class='line'><span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo1 in block&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">foo2</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo2 in block&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
-</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
-</span><span class='line'><span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
-</span><span class='line'><span class="n">foo2</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc</span><span class="p">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>输出：</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='sh'><span class='line'>》foo1 in block
-</span><span class='line'>》foo2 in block
-</span><span class='line'>》foo in proc
-</span><span class='line'>》foo in proc
-</span><span class='line'>》foo in lambda
-</span><span class='line'>》foo in lambda
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>大家是不是有些困惑，首先是方法 foo1 和 foo2 都能接收闭包，它们这两种写法有什么区别，然后是作为参数的三种闭包 block，proc和 lambda有什么区别。</p>
-
-<h2>1. yield 和 block call 的区别</h2>
-
-<p>yield 和 block call 两种都能实现运行闭包，从实际运行效果来说，区别不大。其区别主要在于：</p>
-
-<h3>1.1 闭包的传递和保存</h3>
-
-<p>因为闭包已经传递到参数里，所以可以继续传递或保存起来，例如：</p>
-
-<p>Exampl 2:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">class</span> <span class="nc">A</span>
-</span><span class='line'>      <span class="k">def</span> <span class="nf">foo1</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
-</span><span class='line'>         <span class="vi">@proc</span> <span class="o">=</span> <span class="n">b</span>
-</span><span class='line'>      <span class="k">end</span>
-</span><span class='line'>      <span class="k">def</span> <span class="nf">foo2</span>
-</span><span class='line'>          <span class="vi">@proc</span><span class="o">.</span><span class="n">call</span> <span class="k">if</span> <span class="vi">@proc</span>
-</span><span class='line'>      <span class="k">end</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="n">a</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo1</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;proc from foo1&quot;</span> <span class="p">}</span>
-</span><span class='line'>    <span class="n">a</span><span class="o">.</span><span class="n">foo2</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<h3>1.2 性能</h3>
-
-<p>yield不是方法调用，而是 Ruby 的关键字，yield 要比 block call 比快 1 倍左右。</p>
-
-<h2>2. block 和 proc, lambda 的区别</h2>
-
-<p>很简单直接，引入 proc 和 lambda 就是为了复用，避免重复定义，例如在 example 1 中，使用 proc 变量存储闭包，避免重复定义两个 block 。</p>
-
-<h2>3. proc 和 lambda 的区别</h2>
-
-<p>这大概是最让人困惑的地方，从 Example 1 的行为上看，他们的效果是一致的，为什么要用两种不同的表达方式。</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in proc&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">lambda_proc</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="nb">puts</span> <span class="s2">&quot;foo in lambda&quot;</span> <span class="p">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>确实，对于简单的情况，比如 Example 1的情况，他们的行为是一致的，但是主要在两个地方有明显差异：</p>
-
-<h3>1.1 参数检查</h3>
-
-<p>还是例子说话
-Example 3:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
-</span><span class='line'>      <span class="n">x</span> <span class="o">=</span> <span class="mi">100</span>
-</span><span class='line'>      <span class="k">yield</span> <span class="n">x</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>   <span class="nb">proc</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="nb">proc</span><span class="p">)</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'>   <span class="n">lambda_proc1</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc1</span><span class="p">)</span>
-</span><span class='line'>   <span class="n">lambda_proc2</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="o">|</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">|</span> <span class="nb">puts</span> <span class="s2">&quot;a is </span><span class="si">#{</span><span class="n">a</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2"> b is </span><span class="si">#{</span><span class="n">b</span><span class="o">.</span><span class="n">inspect</span><span class="si">}</span><span class="s2">&quot;</span> <span class="p">}</span>
-</span><span class='line'>   <span class="n">foo</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lambda_proc2</span><span class="p">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>输出</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》a is 100 b is nil
-</span><span class='line'>   》a is 100
-</span><span class='line'>   》ArgumentError: wrong number of arguments <span class="o">(</span>1 <span class="k">for </span>2<span class="o">)</span>
-</span><span class='line'>      …
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>    <br/>
-可见，proc 不会对参数进行个数匹配检查，而 lambda 会，如果不匹配还会报异常，所以安全起见，建议优先用 lambda。</p>
-
-<h3>1.2 返回上层</h3>
-
-<p>还是例子说话
-Example 4:</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'>   <span class="k">def</span> <span class="nf">foo</span>
-</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from foo from inside proc&quot;</span> <span class="p">}</span>
-</span><span class='line'>     <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control leaves foo here</span>
-</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from foo&quot;</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'>   <span class="k">def</span> <span class="nf">bar</span>
-</span><span class='line'>     <span class="n">f</span> <span class="o">=</span> <span class="nb">lambda</span> <span class="p">{</span> <span class="k">return</span> <span class="s2">&quot;return from lambda&quot;</span> <span class="p">}</span>
-</span><span class='line'>     <span class="nb">puts</span> <span class="n">f</span><span class="o">.</span><span class="n">call</span> <span class="c1"># control does not leave bar here</span>
-</span><span class='line'>     <span class="k">return</span> <span class="s2">&quot;return from bar&quot;</span>
-</span><span class='line'>   <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>
-</span><span class='line'>   <span class="nb">puts</span> <span class="n">foo</span>
-</span><span class='line'>   <span class="nb">puts</span> <span class="n">bar</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>   输出</p>
-
-<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='sh'><span class='line'>   》return from foo from inside proc
-</span><span class='line'>   》return from lambda
-</span><span class='line'>   》return from bar
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p> <br/>
-可见，proc 中，return 相当于执行了闭包环境里的 return，而 lambda 只是返回call 闭包所在环境。</p>
-
-<p><em>总结：闭包是 Ruby 的强大特性，它的几种表达方式block，proc 和 lambda有细微差别，要用好它需要对其深入理解。</em></p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/4/">&larr; Older</a>
@@ -2034,6 +1863,10 @@ Example 4:</p>
   <ul id="recent_posts">
     
       <li class="post">
+        <a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题</a>
+      </li>
+    
+      <li class="post">
         <a href="/blog/2015/03/22/four-equality-operations-in-ruby/">ruby 中的 4 种相等性判断方法</a>
       </li>
     
@@ -2047,10 +1880,6 @@ Example 4:</p>
     
       <li class="post">
         <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数的 3 种方法</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/12/14/mysql-partition-table-in-rails/">Rails 中 MySQL 分区表使用的一个注意事项</a>
       </li>
     
   </ul>
@@ -2067,7 +1896,7 @@ Example 4:</p>
     </div>
   </div>
   <footer role="contentinfo"><p>
-  Copyright &copy; 2015 - vincent -
+  Copyright &copy; 2016 - vincent -
   <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
 </p>
 

@@ -4,7 +4,7 @@
   <title><![CDATA[Category: cache | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/cache/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2016-02-21T21:57:31+08:00</updated>
+  <updated>2016-02-21T22:00:43+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -50,9 +50,9 @@ end</p>
 <p>Benchmark.bm do |x|
   x.report "  1" do</p>
 
-<pre><code>n.times do |i| 
+<pre><code>n.times do |i|
   Rails.cache.read "user:#{i}:counter"
-end 
+end
 </code></pre>
 
 <p>  end</p>
@@ -83,13 +83,13 @@ end
 <pre><code>read_by_batch n, 100
 </code></pre>
 
-<p>  end<br/>
+<p>  end
 end
 ```</p>
 
 <p>执行结果如下所示：</p>
 
-<p>```shell</p>
+<p>```bash</p>
 
 <pre><code>   user     system      total        real
 </code></pre>
