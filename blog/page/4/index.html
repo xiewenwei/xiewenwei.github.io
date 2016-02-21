@@ -9,7 +9,8 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="在规则引擎中，Ruby 的闭包使用特别频繁，而且有 block，Proc和 lambda 等后几种形式的用法，很让人困惑。为了深入理解代码，再次认真学习了一下 Ruby 的闭包，特别是 block，proc 和 lambda 几种用法的异同，这次的周记就和大家分享一下心得。 闭包是 Ruby &hellip;">
+  <meta name="description" content="昨天参加了 RubyConfChina2012 大会，听了好几个非常精彩的主题演讲，收获良多。 第一个主题演讲是 Ruby 之父 Matz 先生的演讲《Be a lanuage designer》。Matz 的演讲主要有三个部分：
+一是如何成为语言的设计师，设计语言没有大家想象中的那么困难， &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -68,6 +69,67 @@
     <div id="content">
       <div class="blog-index">
   
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2012/11/18/rubyconfchina2012gan-xiang/">RubyConfChina2012感想</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-11-18T22:11:00+08:00" pubdate data-updated="true">2012-11-18</time>
+        
+         | <a href="/blog/2012/11/18/rubyconfchina2012gan-xiang/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>昨天参加了 RubyConfChina2012 大会，听了好几个非常精彩的主题演讲，收获良多。</p>
+
+<p>第一个主题演讲是 Ruby 之父 Matz 先生的演讲《Be a lanuage designer》。Matz 的演讲主要有三个部分：
+一是如何成为语言的设计师，设计语言没有大家想象中的那么困难，每个开发者平时设计的代码、API和接口其实都是一门“语言”，如果想要设计一门语言，不妨先从DSL写起；
+二是Ruby 2.0的最新消息，Ruby 2.0 将会在 Ruby 的20岁生日&#8211;2013年2月24日发布，Ruby 2.0 将带来一些非常有意思的特性，比如 Refinement, Module#prepend，Enumerable#lazy 和 Keyword formal Argument等；
+三是 mruby 的最新消息，mruby 可以算是 Ruby 的一个子集，它非常小巧精悍（&lt;500K），适用于嵌入式环境，能够运行于小型设备如智能手机，智能网络路由器和机顶盒等等，还介绍了mruby相关的几个项目如MobiRuby——mruby for iOS，mruby_nginx——Nginx mruby Extension 和 mruby-libuv——适用于mruby的异步I/O。</p>
+
+<p>Matz 每次演讲带来的消息都让人振奋。我已经装了 Ruby 2.0 preview 版本，我想接下来可以花些时间做测试，为帮助 Ruby 2.0的发布尽自己一些贡献。</p>
+
+<p>第二个演讲是Jesse Zhang的《How Cloud Foundry Dit it(With Ruby)》, Jesse 主要介绍了 Cloud Foundry 的技术架构。也许是对 Cloud Foundry 了解不多，觉得讲得内容比较抽象，对整个演讲印象不深，会后和 Jesse 聊了一下，了解到他们使用了 EventMachine，所有使用的 Gem 都必须是 EM 版本的，这给开发带来了不少麻烦。</p>
+
+<p>第三个演讲是黄志敏的《OpenFeint迁移到JRuby经验》，主要内容是OpenFeint 通过迁移到 JRuby 带来了接近 40% 的性能提升，迁移过程的原因考虑，实施方法和遇到的问题。从他介绍看，OpenFeint 之前使用的技术堆栈和薄荷非常接近，所以今后可以对 JRuby 做深入的研究，它也许是解决性能问题一个好方法。</p>
+
+<p>第四个演讲是Fred Wu的《如何成为一名更优秀的 Ruby 程序员》，全英文的演讲，讲了很多方面，印象比较深的是要参与到开源项目中，既能贡献力量，也能让自己成长。这点自己以前做得不太好，从开源界得到的帮助很多，但是为之做的贡献很少，以后要改进。</p>
+
+<p>第五个演讲是陈金洲的《Ruby on Rails 创业团队全技术栈指南》，介绍Ruby on rails部署，监控和架构的技术栈选择，他的演讲非常幽默，常引来满场欢乐。演讲的内容我大都非常熟悉，因为自己都亲身经历过，不过还是蛮有收获，特别是他提到要关注应用层的监控，可以使用 New Relic 和 Scout 进行监控，让我有不少启发，之前对应用层的监控重视不够，做得不好。</p>
+
+<p>第六个演讲是王益善的《Ruby Arduino Hacking》，介绍了什么是 Arduino，用 Arduino 和 Ruby 演示一些有意思的操作，比如唱《两只老虎》，控制台灯什么的，非常好玩。之前对所谓开源硬件缺乏了解，通过他的介绍，让我有了直观的认识，觉得蛮有趣的，以后有空也想折腾一番，呵呵。</p>
+
+<p>第七个演讲是马海波的《程序员如何设计》，从程序员的角度探讨如何学习，应用设计，一个很深的体会是他的 ppt 做的很漂亮，非常有设计感。自己向来对设计心存畏惧，从他的演讲找到了一些信心，以后一定要学一学设计。</p>
+
+<p>最后是一个小演讲，王松林介绍他们在嵌入设备上使用 cruby 和 mruby 的一些经验。</p>
+
+<p>RubyConfChina 大会已经举办了 4 届，这 4 届我都有参加，感觉这一届是过往最热闹，最精彩的一届，可以明显感觉到 Ruby 在中国稳步前行，让我为自己作为一名 Ruby 程序员而自豪。感谢辛勤大会组织者，感谢杰出的演讲者，感谢所有为大会贡献的公司和个人，相信 Ruby 的世界会更美好，中国的 Ruby 更美好。</p>
+</div>
+  
+  
+
+
+    </article>
   
   
     <article>
@@ -589,7 +651,11 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题</a>
+        <a href="/blog/2016/02/21/how-to-rescue-exception-in-ruby/">怎样才是 ruby 中捕获异常的正确姿势？</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢 - 缓存使用的 N+1 问题</a>
       </li>
     
       <li class="post">
@@ -602,10 +668,6 @@ Object 中的定义了 to_s 和 inspect 方法，默认都是返回对象的类�
     
       <li class="post">
         <a href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">Rails 中 mattr_accessor 一处文档错误</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数的 3 种方法</a>
       </li>
     
   </ul>

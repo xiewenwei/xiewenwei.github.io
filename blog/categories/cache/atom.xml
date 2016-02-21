@@ -4,7 +4,7 @@
   <title><![CDATA[Category: cache | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/cache/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2016-02-21T22:00:43+08:00</updated>
+  <updated>2016-02-21T22:57:55+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -14,13 +14,11 @@
 
   
   <entry>
-    <title type="html"><![CDATA[缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题]]></title>
+    <title type="html"><![CDATA[缓存可能让你的应用更慢 - 缓存使用的 N+1 问题]]></title>
     <link href="http://xiewenwei.github.com//blog/2015/05/27/cache-trap/"/>
     <updated>2015-05-27T17:43:00+08:00</updated>
     <id>http://xiewenwei.github.com//blog/2015/05/27/cache-trap</id>
     <content type="html"><![CDATA[<p>缓存是提升系统性能非常有效的手段，常常起到立竿见影的效果，但是有时不恰当的使用不但起不到优化效果，反而可能让系统更慢。下面总结缓存使用过程中常见的一些陷阱。</p>
-
-<hr />
 
 <p>大家应该比较熟悉数据库查询时的 N+1 问题，在缓存中同样存在 N+1 问题。当应用中出现需要多次读取缓存的时候，虽然单次读取缓存速度很快，但是多次读取缓存累计时间相当可观，很可能会成为一个性能瓶颈。</p>
 
@@ -123,15 +121,6 @@ end
 ```</p>
 
 <p>总结：缓存虽然很快，但它毕竟也是一次 IO 操作，同样需要消耗一定时间，如果某一次特别大量读写缓存，很可能会以前性能问题，通过批量读取方式是解决该问题的有效手段。</p>
-
-<p>这是“缓存使用陷阱”系列文章的第 1 篇，接下来还会带来：
-* 2. 空数据导致缓存失效
-* 3. 缓存大量无用数据导致内存浪费
-* 4. 过度使用缓存
-* 5. 把缓存当成存储使用导致数据丢失</p>
-
-<p>希望分享薄荷系统中遇到并解决的一些问题，能够对大家有所帮助。
-薄荷正在招聘 ruby 伙伴，有兴趣请看 https://ruby-china.org/topics/25585 。</p>
 ]]></content>
   </entry>
   

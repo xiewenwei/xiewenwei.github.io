@@ -150,7 +150,11 @@
     </url>
     <url>
         <loc>http://xiewenwei.github.com//blog/2015/05/27/cache-trap/</loc>
-        <lastmod>2016-02-21T22:00:27+08:00</lastmod>
+        <lastmod>2016-02-21T22:08:21+08:00</lastmod>
+    </url>
+    <url>
+        <loc>http://xiewenwei.github.com//blog/2016/02/21/how-to-rescue-exception-in-ruby/</loc>
+        <lastmod>2016-02-21T22:57:21+08:00</lastmod>
     </url>
     <url>
         <loc>http://xiewenwei.github.com//about-me/</loc>
@@ -164,10 +168,10 @@
     </url>
     <url>
         <loc>http://xiewenwei.github.com//blog/archives/</loc>
-        <lastmod>2016-02-21T22:00:27+08:00</lastmod>
+        <lastmod>2016-02-21T22:57:21+08:00</lastmod>
     </url>
     <url>
         <loc>http://xiewenwei.github.com//</loc>
-        <lastmod>2016-02-21T22:00:27+08:00</lastmod>
+        <lastmod>2016-02-21T22:57:21+08:00</lastmod>
     </url>
 </urlset>

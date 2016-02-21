@@ -1,0 +1,377 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>怎样才是 ruby 中捕获异常的正确姿势？ - 程序人生</title>
+  <meta name="author" content="vincent">
+
+  
+  <meta name="description" content="在开发和使用微服务间通信组件 SneakersPacker 过程中遇到异常处理的一些问题，通过解决这些问题让我对 ruby 中捕获异常和定义异常有新的认识。 当初遇到的问题是这样的：薄荷的一个子系统 status 中原本使用 http api call 获取 record 子系统的一些数据，应用 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://xiewenwei.github.com//blog/2016/02/21/how-to-rescue-exception-in-ruby/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/stylesheets/data-table.css" media="screen, projection" rel="stylesheet" type="text/css" />
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="程序人生" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<!--
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+-->
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">程序人生</a></h1>
+  
+    <h2>写优雅的程序，做优雅的人</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://www.google.com.hk/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:xiewenwei.github.com/" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about-me/">About Me</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">怎样才是 ruby 中捕获异常的正确姿势？</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-02-21T22:06:00+08:00" pubdate data-updated="true">2016-02-21</time>
+        
+         | <a href="#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>在开发和使用微服务间通信组件 <a href="https://github.com/xiewenwei/sneakers_packer">SneakersPacker</a> 过程中遇到异常处理的一些问题，通过解决这些问题让我对 ruby 中捕获异常和定义异常有新的认识。</p>
+
+<p>当初遇到的问题是这样的：薄荷的一个子系统 status 中原本使用 http api call 获取 record 子系统的一些数据，应用 <code>SneakersPacker</code> 之后，把代码改成了 rpc call。刚开始的时候 SneakersPacker 还有一些问题，为了防止 rpc call 出状况，在代码中提供了一层保护机制，也就是当 <code>SneakersPacker.remote_call</code> 触发异常之后，通过 http api call 获取数据。代码很简单，如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">begin</span>
+</span><span class='line'>    <span class="n">res</span> <span class="o">=</span> <span class="no">SneakersPacker</span><span class="o">.</span><span class="n">remote_call</span> <span class="s2">&quot;record.get_simple_profile&quot;</span><span class="p">,</span> <span class="n">params_data</span>
+</span><span class='line'>  <span class="k">rescue</span>
+</span><span class='line'>    <span class="n">res</span> <span class="o">=</span> <span class="no">HTTPProxy</span><span class="o">::</span><span class="no">Record</span><span class="o">.</span><span class="n">get</span> <span class="s2">&quot;api/v1/users/simple_profile&quot;</span><span class="p">,</span> <span class="n">params_data</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>但是实际运行结果很让人诧异，remote_call 的确触发了异常，但是代码中的 rescue 并没有捕获到异常，而是直接导致程序 500 错误，大量异常记录在日志和监控系统中，让人百思不得其解。在那之前我以为孤立的 <code>rescue</code>会捕获全部异常的，仔细研究网络上的一些文档后，发现并不是这样，rescue 其实只捕获 StandardError 类型的异常。再去查阅 SneakersPacker 的代码，发现原来报了很多的异常 RemoteCallTimeoutError 是这样定义的：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">RemoteCallTimeoutError</span> <span class="o">&lt;</span> <span class="no">Exception</span><span class="p">;</span> <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>RemoteCallTimeoutError 选择父类 Exception 是错误的，应该选择 StandardError，改成下面之后 RemoteCallTimeoutError 象期望的一样被捕获了。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">RemoteCallTimeoutError</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>为了说明 rescue 这个关键字的行为，我们看下面几个例子：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码1</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码2</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码3</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="no">StandardError</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码4</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="no">Exception</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>代码1，代码2和代码3的 rescue 都只捕获 StandardError 类别的异常，而代码4明显不同，代码4会捕获所有 的异常。</p>
+
+<p>一些直接继承自 Exception 而不是 StandardError 的异常包括：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">SystemStackError</span>
+</span><span class='line'><span class="no">NoMemoryError</span>
+</span><span class='line'><span class="no">SecurityError</span>
+</span><span class='line'><span class="no">ScriptError</span>
+</span><span class='line'>  <span class="no">NotImplementedError</span>
+</span><span class='line'>  <span class="no">LoadError</span>
+</span><span class='line'>    <span class="no">Gem</span><span class="o">::</span><span class="no">LoadError</span>
+</span><span class='line'>  <span class="no">SyntaxError</span>
+</span><span class='line'><span class="no">SignalException</span>
+</span><span class='line'>  <span class="no">Interrupt</span>
+</span><span class='line'><span class="no">SystemExit</span>
+</span><span class='line'>  <span class="no">Gem</span><span class="o">::</span><span class="no">SystemExitException</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>都是系统层级严重错误，不应该由应用捕获。</p>
+
+<p>综上所述，总结一些 ruby 中捕获异常的原则（正确姿势）
+- 最好的 rescue 姿势，捕获明确指定的异常，rescue OneError => e
+- 次好的 rescue 姿势，捕获 StandardError，通过 rescue 或 rescue => e
+- <strong>千万千万不要</strong> rescue Exception => e，除非真的知道自己在干嘛
+- 自己定义的异常应该继承自 StandardError ，而不是 Exception</p>
+
+<p>end.</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">vincent</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-02-21T22:06:00+08:00" pubdate data-updated="true">2016-02-21</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/ruby/'>ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2015/05/27/cache-trap/" title="Previous Post: 缓存可能让你的应用更慢 - 缓存使用的 N+1 问题">&laquo; 缓存可能让你的应用更慢 - 缓存使用的 N+1 问题</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2016/02/21/how-to-rescue-exception-in-ruby/">怎样才是 ruby 中捕获异常的正确姿势？</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢 - 缓存使用的 N+1 问题</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/03/22/four-equality-operations-in-ruby/">ruby 中的 4 种相等性判断方法</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/02/01/refactor-broadcast-feature/">重构系统广播功能</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">Rails 中 mattr_accessor 一处文档错误</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2016 - vincent -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'bohe';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://xiewenwei.github.com//blog/2016/02/21/how-to-rescue-exception-in-ruby/';
+        var disqus_url = 'http://xiewenwei.github.com//blog/2016/02/21/how-to-rescue-exception-in-ruby/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

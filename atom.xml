@@ -4,7 +4,7 @@
   <title><![CDATA[程序人生]]></title>
   <link href="http://xiewenwei.github.com//atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2016-02-21T22:00:43+08:00</updated>
+  <updated>2016-02-21T22:57:55+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -14,13 +14,164 @@
 
   
   <entry>
-    <title type="html"><![CDATA[缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题]]></title>
+    <title type="html"><![CDATA[怎样才是 ruby 中捕获异常的正确姿势？]]></title>
+    <link href="http://xiewenwei.github.com//blog/2016/02/21/how-to-rescue-exception-in-ruby/"/>
+    <updated>2016-02-21T22:06:00+08:00</updated>
+    <id>http://xiewenwei.github.com//blog/2016/02/21/how-to-rescue-exception-in-ruby</id>
+    <content type="html"><![CDATA[<p>在开发和使用微服务间通信组件 <a href="https://github.com/xiewenwei/sneakers_packer">SneakersPacker</a> 过程中遇到异常处理的一些问题，通过解决这些问题让我对 ruby 中捕获异常和定义异常有新的认识。</p>
+
+<p>当初遇到的问题是这样的：薄荷的一个子系统 status 中原本使用 http api call 获取 record 子系统的一些数据，应用 <code>SneakersPacker</code> 之后，把代码改成了 rpc call。刚开始的时候 SneakersPacker 还有一些问题，为了防止 rpc call 出状况，在代码中提供了一层保护机制，也就是当 <code>SneakersPacker.remote_call</code> 触发异常之后，通过 http api call 获取数据。代码很简单，如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">begin</span>
+</span><span class='line'>    <span class="n">res</span> <span class="o">=</span> <span class="no">SneakersPacker</span><span class="o">.</span><span class="n">remote_call</span> <span class="s2">&quot;record.get_simple_profile&quot;</span><span class="p">,</span> <span class="n">params_data</span>
+</span><span class='line'>  <span class="k">rescue</span>
+</span><span class='line'>    <span class="n">res</span> <span class="o">=</span> <span class="no">HTTPProxy</span><span class="o">::</span><span class="no">Record</span><span class="o">.</span><span class="n">get</span> <span class="s2">&quot;api/v1/users/simple_profile&quot;</span><span class="p">,</span> <span class="n">params_data</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>但是实际运行结果很让人诧异，remote_call 的确触发了异常，但是代码中的 rescue 并没有捕获到异常，而是直接导致程序 500 错误，大量异常记录在日志和监控系统中，让人百思不得其解。在那之前我以为孤立的 <code>rescue</code>会捕获全部异常的，仔细研究网络上的一些文档后，发现并不是这样，rescue 其实只捕获 StandardError 类型的异常。再去查阅 SneakersPacker 的代码，发现原来报了很多的异常 RemoteCallTimeoutError 是这样定义的：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">RemoteCallTimeoutError</span> <span class="o">&lt;</span> <span class="no">Exception</span><span class="p">;</span> <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>RemoteCallTimeoutError 选择父类 Exception 是错误的，应该选择 StandardError，改成下面之后 RemoteCallTimeoutError 象期望的一样被捕获了。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">RemoteCallTimeoutError</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>为了说明 rescue 这个关键字的行为，我们看下面几个例子：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码1</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码2</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码3</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="no">StandardError</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码4</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="no">Exception</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>代码1，代码2和代码3的 rescue 都只捕获 StandardError 类别的异常，而代码4明显不同，代码4会捕获所有 的异常。</p>
+
+<p>一些直接继承自 Exception 而不是 StandardError 的异常包括：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">SystemStackError</span>
+</span><span class='line'><span class="no">NoMemoryError</span>
+</span><span class='line'><span class="no">SecurityError</span>
+</span><span class='line'><span class="no">ScriptError</span>
+</span><span class='line'>  <span class="no">NotImplementedError</span>
+</span><span class='line'>  <span class="no">LoadError</span>
+</span><span class='line'>    <span class="no">Gem</span><span class="o">::</span><span class="no">LoadError</span>
+</span><span class='line'>  <span class="no">SyntaxError</span>
+</span><span class='line'><span class="no">SignalException</span>
+</span><span class='line'>  <span class="no">Interrupt</span>
+</span><span class='line'><span class="no">SystemExit</span>
+</span><span class='line'>  <span class="no">Gem</span><span class="o">::</span><span class="no">SystemExitException</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>都是系统层级严重错误，不应该由应用捕获。</p>
+
+<p>综上所述，总结一些 ruby 中捕获异常的原则（正确姿势）
+- 最好的 rescue 姿势，捕获明确指定的异常，rescue OneError => e
+- 次好的 rescue 姿势，捕获 StandardError，通过 rescue 或 rescue => e
+- <strong>千万千万不要</strong> rescue Exception => e，除非真的知道自己在干嘛
+- 自己定义的异常应该继承自 StandardError ，而不是 Exception</p>
+
+<p>end.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[缓存可能让你的应用更慢 - 缓存使用的 N+1 问题]]></title>
     <link href="http://xiewenwei.github.com//blog/2015/05/27/cache-trap/"/>
     <updated>2015-05-27T17:43:00+08:00</updated>
     <id>http://xiewenwei.github.com//blog/2015/05/27/cache-trap</id>
     <content type="html"><![CDATA[<p>缓存是提升系统性能非常有效的手段，常常起到立竿见影的效果，但是有时不恰当的使用不但起不到优化效果，反而可能让系统更慢。下面总结缓存使用过程中常见的一些陷阱。</p>
-
-<hr />
 
 <p>大家应该比较熟悉数据库查询时的 N+1 问题，在缓存中同样存在 N+1 问题。当应用中出现需要多次读取缓存的时候，虽然单次读取缓存速度很快，但是多次读取缓存累计时间相当可观，很可能会成为一个性能瓶颈。</p>
 
@@ -148,15 +299,6 @@
 
 
 <p>总结：缓存虽然很快，但它毕竟也是一次 IO 操作，同样需要消耗一定时间，如果某一次特别大量读写缓存，很可能会以前性能问题，通过批量读取方式是解决该问题的有效手段。</p>
-
-<p>这是“缓存使用陷阱”系列文章的第 1 篇，接下来还会带来：
-* 2. 空数据导致缓存失效
-* 3. 缓存大量无用数据导致内存浪费
-* 4. 过度使用缓存
-* 5. 把缓存当成存储使用导致数据丢失</p>
-
-<p>希望分享薄荷系统中遇到并解决的一些问题，能够对大家有所帮助。
-薄荷正在招聘 ruby 伙伴，有兴趣请看 https://ruby-china.org/topics/25585 。</p>
 ]]></content>
   </entry>
   
@@ -1521,349 +1663,6 @@ base 是 Host，self 是 Bar，Host 没有 <code>extend ActiveSupport::Concern</
 <li><p>可以通过覆盖这些方法改变操作的行为；</p></li>
 <li><p>可以定义模块实例变量存储属于该模块的一些数据；</p></li>
 </ol>
-
-]]></content>
-  </entry>
-  
-  <entry>
-    <title type="html"><![CDATA[Ruby on Rails 线程安全代码]]></title>
-    <link href="http://xiewenwei.github.com//blog/2014/01/12/thread-safety-code-for-ruby-on-rails/"/>
-    <updated>2014-01-12T22:52:00+08:00</updated>
-    <id>http://xiewenwei.github.com//blog/2014/01/12/thread-safety-code-for-ruby-on-rails</id>
-    <content type="html"><![CDATA[<p>Ruby on Rails 4.0 的 rc 版本已经 release 了，Rails 4 时代最大的变化当属默认开启多线程模式。Rails 4 的多线程将给大家带来什么好处呢？至少有两方面：</p>
-
-
-
-
-<ol>
-<li><p>更高的系统吞吐量
-Web 站点多是 IO 密集型的，多线程可以让 Application 在等待 IO 操作的同时，还能接收处理请求，大大提升系统吞吐量，增强系统稳定性和安全性。</p></li>
-<li><p>更省内存
-Ruby on Rails 是内存消耗大户，一个 Applicaion 占用几百兆是常事，以前使用仅使用多进程的并发模式时，整体内存消耗巨大，使用多进程+多线程的并发模式，不单系统吞吐量大大提供，系统整体使用内存也大幅下降。</p></li>
-</ol>
-
-
-
-
-<p>但是天下没有免费的午餐，在享用这些好处的同时，我们也必须付出一定的代价，代价就是要应付多线程编程带来的复杂性。程序中需要处理多线程可能导致问题的地方，如果程序中出现问题也变得更加难以发现调试。</p>
-
-
-
-
-<p>好在需要注意的地方也不是太多，下面把这几个需要注意的地方一一说明。</p>
-
-
-
-
-<h2>代码加载</h2>
-
-
-
-
-<p>Ruby 的 require 并非线程安全的，在多线程中 require，可能会导致严重的不可预期的错误。例如下面的一个演示程序在 Ruby 1.9 环境下执行会发生死锁。</p>
-
-
-
-
-<p>a.rb 文件：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">Thread</span><span class="o">.</span><span class="n">current</span><span class="si">}</span><span class="s2">: a.rb&quot;</span>
-</span><span class='line'><span class="nb">sleep</span> <span class="mi">1</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">Thread</span><span class="o">.</span><span class="n">current</span><span class="si">}</span><span class="s2">: requiring b&quot;</span>
-</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;b&#39;</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>b.rb 文件：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">Thread</span><span class="o">.</span><span class="n">current</span><span class="si">}</span><span class="s2">: b.rb&quot;</span>
-</span><span class='line'><span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">Thread</span><span class="o">.</span><span class="n">current</span><span class="si">}</span><span class="s2">: requiring a&quot;</span>
-</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;a&#39;</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>test.rb 文件：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="vg">$LOAD_PATH</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;.&quot;</span>
-</span><span class='line'>
-</span><span class='line'><span class="n">t1</span> <span class="o">=</span> <span class="no">Thread</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">require</span> <span class="s1">&#39;a&#39;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">t2</span> <span class="o">=</span> <span class="no">Thread</span><span class="o">.</span><span class="n">new</span> <span class="p">{</span> <span class="nb">require</span> <span class="s1">&#39;b&#39;</span> <span class="p">}</span>
-</span><span class='line'><span class="n">t1</span><span class="o">.</span><span class="n">join</span>
-</span><span class='line'><span class="n">t2</span><span class="o">.</span><span class="n">join</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>在 Ruby 1.9 环境下运行 test.rb 将报死锁错误：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="c">#&lt;Thread:0x007fd2da90a268&gt;: b.rb</span>
-</span><span class='line'><span class="c">#&lt;Thread:0x007fd2da90a268&gt;: requiring a</span>
-</span><span class='line'><span class="c">#&lt;Thread:0x007fd2da90a2e0&gt;: a.rb</span>
-</span><span class='line'><span class="c">#&lt;Thread:0x007fd2da90a2e0&gt;: requiring b</span>
-</span><span class='line'>test.rb:5:in <span class="sb"><code>&lt;/span&gt;join&lt;span class="s1"&gt;&amp;#39;: deadlock detected (fatal)&lt;/span&gt;
-&lt;/span&gt;&lt;span class='line'&gt;&lt;span class="s1"&gt;  from test.rb:5:in</code>&lt;main&gt;&#39;</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>因为 Ruby require 不是线程安全的，所以 Rails 中使用多线程环境时，需要对 require 做一定的限制，简单的说就是在 Application 启动的时候，把所有需要加载的代码全部加载完成，避免启动后还 require。Rails 4 的生产环境配置中该选项已经默认生效。需要注意的时，如果你的代码不在 Rails 默认的几个目录中，你需要手动配置你的目录进入 eager_load_path，例如：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="n">config</span><span class="o">.</span><span class="n">eager_load_paths</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="no">Rails</span><span class="o">.</span><span class="n">root</span><span class="si">}</span><span class="s2">/lib&quot;</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<h2>全局变量和类变量写操作</h2>
-
-
-
-
-<p>在 Rails 多线程环境，所有的全局变量（包括 $var @@var 和 类实例变量），在实例方法中都应该是只读的，尽量应该避免写操作。</p>
-
-
-
-
-<p>下面是一个在实例方法中写类变量导致问题的例子：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">HomeController</span> <span class="o">&lt;</span> <span class="no">ApplicationController</span>
-</span><span class='line'>  <span class="n">before_filter</span> <span class="ss">:set_site</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">index</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="kp">private</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">set_site</span>
-</span><span class='line'>    <span class="vi">@site</span> <span class="o">=</span> <span class="no">Site</span><span class="o">.</span><span class="n">find_by_subdomain</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">subdomains</span><span class="o">.</span><span class="n">first</span><span class="p">)</span>
-</span><span class='line'>    <span class="k">if</span> <span class="vi">@site</span><span class="o">.</span><span class="n">layout?</span>
-</span><span class='line'>      <span class="nb">self</span><span class="o">.</span><span class="n">class</span><span class="o">.</span><span class="n">layout</span><span class="p">(</span><span class="vi">@site</span><span class="o">.</span><span class="n">layout_name</span><span class="p">)</span>
-</span><span class='line'>    <span class="k">else</span>
-</span><span class='line'>      <span class="nb">self</span><span class="o">.</span><span class="n">class</span><span class="o">.</span><span class="n">layout</span><span class="p">(</span><span class="s1">&#39;default_lay&#39;</span><span class="p">)</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>上面代码的意图是根据域名设置不同的 layout。<code>self.class.layout(value)</code> 中，Rails 把 value 保存在类变量 <code>@@layout_</code>，然后在 render 的时候使用。</p>
-
-
-
-
-<p>设想这样一种情况 UserA 的 subdomain 是 foo1，他的 layout 应该是 foo1，
-UserB 的 subdomain 是 foo2，他的 layout 应该是 foo2。</p>
-
-
-
-
-<p>UserA 和 UserB 同时请求应用，他们的请求分别在 Thread1 和 Thread2 中执行，执行顺序可能是：</p>
-
-
-
-
-<ol>
-<li>Thread1, 执行进入 set_site 方法，设置 <code>@@layout_</code> 为 foo1；</li>
-<li>Thread2, 执行进入 set_site 方法，设置 <code>@@layout_</code> 为 foo2；</li>
-<li>Thread1, render response，使用最新的 <code>@@layout_</code> foo2 render；</li>
-<li>Thread2，render response，使用最新的 <code>@@layout_</code> foo2 render；</li>
-</ol>
-
-
-
-
-<p>我们期望 Thread1 使用 foo1 layout render，这样的执行结果和期望的不相符。</p>
-
-
-
-
-<p>线程安全的写法是：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">HomeController</span> <span class="o">&lt;</span> <span class="no">ApplicationController</span>
-</span><span class='line'>  <span class="n">before_filter</span> <span class="ss">:set_site</span>
-</span><span class='line'>  <span class="n">layout</span> <span class="ss">:site_layout</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">index</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="kp">private</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">set_site</span>
-</span><span class='line'>    <span class="vi">@site</span> <span class="o">=</span> <span class="no">Site</span><span class="o">.</span><span class="n">find_by_subdomain</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">subdomains</span><span class="o">.</span><span class="n">first</span><span class="p">)</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">site_layout</span>
-</span><span class='line'>    <span class="k">if</span> <span class="vi">@site</span><span class="o">.</span><span class="n">layout?</span>
-</span><span class='line'>      <span class="vi">@site</span><span class="o">.</span><span class="n">layout_name</span>
-</span><span class='line'>    <span class="k">else</span>
-</span><span class='line'>      <span class="s1">&#39;default_lay&#39;</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>程序在每次需要使用 layout 时，调用实例方法 <code>site_layout</code>，避免写类变量。</p>
-
-
-
-
-<h2>IO Connection</h2>
-
-
-
-
-<p>Rails 应用通常会用到多个 IO Connection，比如 ActiveRecord 的数据库 Connection，缓存 Memcached 的 Connection，Redis 的 Connection 等等。这些 IO Connection 在 Rails 多线程环境下并不都是线程安全的。</p>
-
-
-
-
-<p>ActiveRecord 的 Connection 是线程安全的，而且 ActiveRecord 还可配置 Connection Pool，这样可以更高效率的利用数据库连接。</p>
-
-
-
-
-<p>Memcached 的 Connection memchached-client 并不是线程安全的，最新的 dalli 是线程安全的。不过 dalli 的线程安全机制是在每个读写操作时加上互斥信号控制，这意味着同一时间只有一个线程可以操作，如果操作非常频繁的话，可能有性能上的问题，这个时候可以使用一个单独的 Connection Pool Gem 解决。</p>
-
-
-
-
-<p>这个 Connection Pool Gem 的地址是 https://github.com/mperham/connection_pool。</p>
-
-
-
-
-<p>Redis 的 Connection 和 dalli 类似，本身通过加上互斥信号控制保证线程安全，可以通过 Connection Pool 增强效率。</p>
-
-
-
-
-<h2>使用互斥信号控制非线程安全操作</h2>
-
-
-
-
-<p>在程序中，如果存在某些不希望多个线程同时执行的操作，可以使用互斥信号控制其执行，这样当已经有一个线程进入执行时，其他进入的 thread 都会被 block 住，等前面的进程执行结束后才会进入执行，从而保证在一个时间只有一个线程会执行。</p>
-
-
-
-
-<p>示例代码如下：</p>
-
-
-<p><figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="k">class</span> <span class="nc">HomeController</span> <span class="o">&lt;</span> <span class="no">ApplicationController</span>
-</span><span class='line'>  <span class="vc">@@lock</span> <span class="o">=</span> <span class="no">Mutex</span><span class="o">.</span><span class="n">new</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">index</span>
-</span><span class='line'>    <span class="vc">@@lock</span><span class="o">.</span><span class="n">synchronize</span> <span class="k">do</span>
-</span><span class='line'>      <span class="n">thread_unsafe_code</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="kp">private</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">def</span> <span class="nf">thread_unsafe_code</span>
-</span><span class='line'>    <span class="k">if</span> <span class="vc">@@something</span> <span class="o">==</span> <span class="s1">&#39;hello&#39;</span>
-</span><span class='line'>      <span class="n">do_hello</span>
-</span><span class='line'>    <span class="k">elsif</span> <span class="vc">@@something</span> <span class="o">==</span> <span class="s1">&#39;world&#39;</span>
-</span><span class='line'>      <span class="n">do_world</span>
-</span><span class='line'>    <span class="k">else</span>
-</span><span class='line'>      <span class="vc">@@something</span> <span class="o">=</span> <span class="s1">&#39;nothing&#39;</span>
-</span><span class='line'>    <span class="k">end</span>
-</span><span class='line'>  <span class="k">end</span>
-</span><span class='line'><span class="k">end</span>
-</span></code></pre></td></tr></table></div></figure></p>
-
-<p>总之，Rails 的多线程为我们提供了简便的提升系统伸缩性的能力，这也意味的程序复杂性的增加，有几处地方使我们需要注意的，只有这样才能很好的利用 Rails 多线程能力。</p>
-
-
-
-
-<p>参考：</p>
-
-
-
-
-<ul>
-<li><a href="http://m.onkey.org/thread-safety-for-your-rails/">http://m.onkey.org/thread-safety-for-your-rails/</a></li>
-<li><a href="http://blog.headius.com/2008/08/qa-what-thread-safe-rails-means.html/">http://blog.headius.com/2008/08/qa-what-thread-safe-rails-means.html/</a></li>
-<li><a href="http://tenderlovemaking.com/2012/06/18/removing-config-threadsafe.html/">http://tenderlovemaking.com/2012/06/18/removing-config-threadsafe.html/</a></li>
-</ul>
 
 ]]></content>
   </entry>

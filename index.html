@@ -9,7 +9,7 @@
   <meta name="author" content="vincent">
 
   
-  <meta name="description" content="缓存是提升系统性能非常有效的手段，常常起到立竿见影的效果，但是有时不恰当的使用不但起不到优化效果，反而可能让系统更慢。下面总结缓存使用过程中常见的一些陷阱。 大家应该比较熟悉数据库查询时的 N+1 问题，在缓存中同样存在 N+1 问题。当应用中出现需要多次读取缓存的时候，虽然单次读取缓存速度很快， &hellip;">
+  <meta name="description" content="在开发和使用微服务间通信组件 SneakersPacker 过程中遇到异常处理的一些问题，通过解决这些问题让我对 ruby 中捕获异常和定义异常有新的认识。 当初遇到的问题是这样的：薄荷的一个子系统 status 中原本使用 http api call 获取 record 子系统的一些数据，应用 &hellip;">
   
 
   <!-- http://t.co/dKP3o1e -->
@@ -74,7 +74,189 @@
       
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题</a></h1>
+      <h1 class="entry-title"><a href="/blog/2016/02/21/how-to-rescue-exception-in-ruby/">怎样才是 ruby 中捕获异常的正确姿势？</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2016-02-21T22:06:00+08:00" pubdate data-updated="true">2016-02-21</time>
+        
+         | <a href="/blog/2016/02/21/how-to-rescue-exception-in-ruby/#disqus_thread">Comments</a>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>在开发和使用微服务间通信组件 <a href="https://github.com/xiewenwei/sneakers_packer">SneakersPacker</a> 过程中遇到异常处理的一些问题，通过解决这些问题让我对 ruby 中捕获异常和定义异常有新的认识。</p>
+
+<p>当初遇到的问题是这样的：薄荷的一个子系统 status 中原本使用 http api call 获取 record 子系统的一些数据，应用 <code>SneakersPacker</code> 之后，把代码改成了 rpc call。刚开始的时候 SneakersPacker 还有一些问题，为了防止 rpc call 出状况，在代码中提供了一层保护机制，也就是当 <code>SneakersPacker.remote_call</code> 触发异常之后，通过 http api call 获取数据。代码很简单，如下所示：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">begin</span>
+</span><span class='line'>    <span class="n">res</span> <span class="o">=</span> <span class="no">SneakersPacker</span><span class="o">.</span><span class="n">remote_call</span> <span class="s2">&quot;record.get_simple_profile&quot;</span><span class="p">,</span> <span class="n">params_data</span>
+</span><span class='line'>  <span class="k">rescue</span>
+</span><span class='line'>    <span class="n">res</span> <span class="o">=</span> <span class="no">HTTPProxy</span><span class="o">::</span><span class="no">Record</span><span class="o">.</span><span class="n">get</span> <span class="s2">&quot;api/v1/users/simple_profile&quot;</span><span class="p">,</span> <span class="n">params_data</span>
+</span><span class='line'>  <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>但是实际运行结果很让人诧异，remote_call 的确触发了异常，但是代码中的 rescue 并没有捕获到异常，而是直接导致程序 500 错误，大量异常记录在日志和监控系统中，让人百思不得其解。在那之前我以为孤立的 <code>rescue</code>会捕获全部异常的，仔细研究网络上的一些文档后，发现并不是这样，rescue 其实只捕获 StandardError 类型的异常。再去查阅 SneakersPacker 的代码，发现原来报了很多的异常 RemoteCallTimeoutError 是这样定义的：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">RemoteCallTimeoutError</span> <span class="o">&lt;</span> <span class="no">Exception</span><span class="p">;</span> <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>RemoteCallTimeoutError 选择父类 Exception 是错误的，应该选择 StandardError，改成下面之后 RemoteCallTimeoutError 象期望的一样被捕获了。</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'>  <span class="k">class</span> <span class="nc">RemoteCallTimeoutError</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>为了说明 rescue 这个关键字的行为，我们看下面几个例子：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码1</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码2</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码3</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="no">StandardError</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># 代码4</span>
+</span><span class='line'><span class="k">begin</span>
+</span><span class='line'>  <span class="n">success_job</span>
+</span><span class='line'><span class="k">rescue</span> <span class="no">Exception</span> <span class="o">=&gt;</span> <span class="n">e</span>
+</span><span class='line'>  <span class="n">fail_job</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="err">“</span><span class="n">e</span> <span class="n">is</span> <span class="c1">#{e.inspect}&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>代码1，代码2和代码3的 rescue 都只捕获 StandardError 类别的异常，而代码4明显不同，代码4会捕获所有 的异常。</p>
+
+<p>一些直接继承自 Exception 而不是 StandardError 的异常包括：</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="no">SystemStackError</span>
+</span><span class='line'><span class="no">NoMemoryError</span>
+</span><span class='line'><span class="no">SecurityError</span>
+</span><span class='line'><span class="no">ScriptError</span>
+</span><span class='line'>  <span class="no">NotImplementedError</span>
+</span><span class='line'>  <span class="no">LoadError</span>
+</span><span class='line'>    <span class="no">Gem</span><span class="o">::</span><span class="no">LoadError</span>
+</span><span class='line'>  <span class="no">SyntaxError</span>
+</span><span class='line'><span class="no">SignalException</span>
+</span><span class='line'>  <span class="no">Interrupt</span>
+</span><span class='line'><span class="no">SystemExit</span>
+</span><span class='line'>  <span class="no">Gem</span><span class="o">::</span><span class="no">SystemExitException</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>都是系统层级严重错误，不应该由应用捕获。</p>
+
+<p>综上所述，总结一些 ruby 中捕获异常的原则（正确姿势）
+- 最好的 rescue 姿势，捕获明确指定的异常，rescue OneError => e
+- 次好的 rescue 姿势，捕获 StandardError，通过 rescue 或 rescue => e
+- <strong>千万千万不要</strong> rescue Exception => e，除非真的知道自己在干嘛
+- 自己定义的异常应该继承自 StandardError ，而不是 Exception</p>
+
+<p>end.</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
+      <h1 class="entry-title"><a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢 - 缓存使用的 N+1 问题</a></h1>
     
     
       <p class="meta">
@@ -100,8 +282,6 @@
 
 
   <div class="entry-content"><p>缓存是提升系统性能非常有效的手段，常常起到立竿见影的效果，但是有时不恰当的使用不但起不到优化效果，反而可能让系统更慢。下面总结缓存使用过程中常见的一些陷阱。</p>
-
-<hr />
 
 <p>大家应该比较熟悉数据库查询时的 N+1 问题，在缓存中同样存在 N+1 问题。当应用中出现需要多次读取缓存的时候，虽然单次读取缓存速度很快，但是多次读取缓存累计时间相当可观，很可能会成为一个性能瓶颈。</p>
 
@@ -229,15 +409,6 @@
 
 
 <p>总结：缓存虽然很快，但它毕竟也是一次 IO 操作，同样需要消耗一定时间，如果某一次特别大量读写缓存，很可能会以前性能问题，通过批量读取方式是解决该问题的有效手段。</p>
-
-<p>这是“缓存使用陷阱”系列文章的第 1 篇，接下来还会带来：
-* 2. 空数据导致缓存失效
-* 3. 缓存大量无用数据导致内存浪费
-* 4. 过度使用缓存
-* 5. 把缓存当成存储使用导致数据丢失</p>
-
-<p>希望分享薄荷系统中遇到并解决的一些问题，能够对大家有所帮助。
-薄荷正在招聘 ruby 伙伴，有兴趣请看 https://ruby-china.org/topics/25585 。</p>
 </div>
   
   
@@ -1028,72 +1199,6 @@ diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &l
 
     </article>
   
-  
-    <article>
-      
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2014/08/10/dig-into-git-branch-and-tag/">实例探索 Git 的分支 branch 和标签 tag</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
-  
-
-
-<time datetime="2014-08-10T23:38:00+08:00" pubdate data-updated="true">2014-08-10</time>
-        
-         | <a href="/blog/2014/08/10/dig-into-git-branch-and-tag/#disqus_thread">Comments</a>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>上一篇讲到 Git 的对象模型，通过它已经能够深入了解 Git 背后如何组织和储存数据，但是总觉得还是缺一点什么，那就是 Git 的必杀技分支和对象模型的关系，接下来就通过一些实例来弄清楚 Git 的分支是如何运作的。</p>
-
-<p>在 Git 对象模型中讲到，每一次 Git 提交，都会生成一个 commit 对象，这个 commit 对象有一个 SHA1 key，例如 4240c635214402420f4fd907c378f0d01a5b5d8e。简单的说，Git 的分支就是一个引用 reference，这个引用有一个名称（分支的名称），然后指向一个具体的 commit 对象（通过 commit 对象的 key），就是这么简单。</p>
-
-<p>分支的数据保存在那里呢？都在目录 <code>.git/refs</code> 中，通常这个目录下有三个子目录，分别是 heads，tags 和 remotes。
-我们可以看到 <code>.git/refs/heads</code> 下有一些文件，每一个文件表示一个分支，文件的名称就是分支的名称，文件的内容就是 commit 对象的 key。</p>
-
-<p>例如，dig-git 项目里：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>cat .git/refs/heads/master
-</span><span class='line'>058ca0a55e60eae77dac9818f915dad581b5465b
-</span><span class='line'>cat .git/refs/heads/test1
-</span><span class='line'>0c5ca6c9e46a1e6cfe04eaea7cd5db3223ba6693</span></code></pre></td></tr></table></div></figure>
-
-
-<p>是不是很简单，知道了这个原理，我们甚至可以绕开 Git 命令，直接通过文件操作生成一个 branch。
-例如：</p>
-
-<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-</pre></td><td class='code'><pre><code class=''><span class='line'>echo "3c31e0a28cfc7f022984d6f8250a1c5c0670f120" &gt;&gt; .git/refs/heads/test2</span></code></pre></td></tr></table></div></figure>
-
-
-<p>通过上面的命令，在 <code>.git/refs/heads</code> 目录下生成一个 test2 文件，文件内容是一个 commit 对象的 key，这样就生成了一个 test2 分支。</p>
-
-<p>标签 tag 和分支 branch 的本质是一样的，都是一个指向 commit 对象的引用，只不过标签 tag 的文件放在 <code>.git/refs/tags</code> 目录下而已。</p>
-</div>
-  
-  
-
-
-    </article>
-  
   <div class="pagination">
     
       <a class="prev" href="/blog/page/2/">&larr; Older</a>
@@ -1109,7 +1214,11 @@ diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &l
   <ul id="recent_posts">
     
       <li class="post">
-        <a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢1 - 缓存使用的 N+1 问题</a>
+        <a href="/blog/2016/02/21/how-to-rescue-exception-in-ruby/">怎样才是 ruby 中捕获异常的正确姿势？</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/27/cache-trap/">缓存可能让你的应用更慢 - 缓存使用的 N+1 问题</a>
       </li>
     
       <li class="post">
@@ -1122,10 +1231,6 @@ diet_item destroy 生成的语句类似于 <code>delete diet_items where id = &l
     
       <li class="post">
         <a href="/blog/2015/01/11/mattr-accessor-in-ruby-on-rails-activesupport/">Rails 中 mattr_accessor 一处文档错误</a>
-      </li>
-    
-      <li class="post">
-        <a href="/blog/2014/12/28/cardinality-counting-using-redis/">使用 Redis 进行唯一计数的 3 种方法</a>
       </li>
     
   </ul>
