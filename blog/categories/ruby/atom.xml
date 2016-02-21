@@ -4,7 +4,7 @@
   <title><![CDATA[Category: ruby | 程序人生]]></title>
   <link href="http://xiewenwei.github.com//blog/categories/ruby/atom.xml" rel="self"/>
   <link href="http://xiewenwei.github.com//"/>
-  <updated>2016-02-21T22:57:55+08:00</updated>
+  <updated>2016-02-21T23:25:52+08:00</updated>
   <id>http://xiewenwei.github.com//</id>
   <author>
     <name><![CDATA[vincent]]></name>
@@ -20,7 +20,7 @@
     <id>http://xiewenwei.github.com//blog/2016/02/21/how-to-rescue-exception-in-ruby</id>
     <content type="html"><![CDATA[<p>在开发和使用微服务间通信组件 <a href="https://github.com/xiewenwei/sneakers_packer">SneakersPacker</a> 过程中遇到异常处理的一些问题，通过解决这些问题让我对 ruby 中捕获异常和定义异常有新的认识。</p>
 
-<p>当初遇到的问题是这样的：薄荷的一个子系统 status 中原本使用 http api call 获取 record 子系统的一些数据，应用 <code>SneakersPacker</code> 之后，把代码改成了 rpc call。刚开始的时候 SneakersPacker 还有一些问题，为了防止 rpc call 出状况，在代码中提供了一层保护机制，也就是当 <code>SneakersPacker.remote_call</code> 触发异常之后，通过 http api call 获取数据。代码很简单，如下所示：</p>
+<p>当初遇到的问题是这样的：薄荷的一个子系统 status 中原本使用 http api call 获取 record 子系统的一些数据，应用 SneakersPacker 之后，把代码改成了 rpc call。刚开始的时候 SneakersPacker 还有一些问题，为了防止 rpc call 出状况，在代码中提供了一层保护机制，也就是当 SneakersPacker.remote_call 触发异常之后，通过 http api call 获取数据。代码很简单，如下所示：</p>
 
 <p>```ruby
   begin</p>
@@ -34,9 +34,8 @@
 </code></pre>
 
 <p>  end
-```</p>
-
-<p>但是实际运行结果很让人诧异，remote_call 的确触发了异常，但是代码中的 rescue 并没有捕获到异常，而是直接导致程序 500 错误，大量异常记录在日志和监控系统中，让人百思不得其解。在那之前我以为孤立的 <code>rescue</code>会捕获全部异常的，仔细研究网络上的一些文档后，发现并不是这样，rescue 其实只捕获 StandardError 类型的异常。再去查阅 SneakersPacker 的代码，发现原来报了很多的异常 RemoteCallTimeoutError 是这样定义的：</p>
+```
+但是实际运行结果很让人诧异，remote_call 的确触发了异常，但是代码中的 rescue 并没有捕获到异常，而是直接导致程序 500 错误，大量异常记录在日志和监控系统中，让人百思不得其解。在那之前我以为孤立的 rescue 会捕获全部异常的，仔细研究网络上的一些文档后，发现并不是这样，rescue 其实只捕获 StandardError 类型的异常。再去查阅 SneakersPacker 的代码，发现原来报了很多的异常 RemoteCallTimeoutError 是这样定义的：</p>
 
 <p><code>ruby
   class RemoteCallTimeoutError &lt; Exception; end
@@ -97,9 +96,9 @@ rescue Exception => e
 end
 ```</p>
 
-<p>代码1，代码2和代码3的 rescue 都只捕获 StandardError 类别的异常，而代码4明显不同，代码4会捕获所有 的异常。</p>
+<p>代码1，代码2和代码3的 rescue 都只捕获 StandardError 类别的异常，而代码4明显不同，代码4会捕获所有的异常。</p>
 
-<p>一些直接继承自 Exception 而不是 StandardError 的异常包括：</p>
+<p>一些直接继承自 Exception 而不是 StandardError 的异常如下，都是系统层级严重错误，不应该由应用捕获。</p>
 
 <p>```
 SystemStackError
@@ -117,14 +116,17 @@ SignalException
   Interrupt
 SystemExit
   Gem::SystemExitException
-```
-都是系统层级严重错误，不应该由应用捕获。</p>
+```</p>
 
-<p>综上所述，总结一些 ruby 中捕获异常的原则（正确姿势）
-- 最好的 rescue 姿势，捕获明确指定的异常，rescue OneError => e
-- 次好的 rescue 姿势，捕获 StandardError，通过 rescue 或 rescue => e
-- <strong>千万千万不要</strong> rescue Exception => e，除非真的知道自己在干嘛
-- 自己定义的异常应该继承自 StandardError ，而不是 Exception</p>
+<p>综上所述，总结一些 ruby 中捕获异常的原则（正确姿势）</p>
+
+<ol>
+<li>最好的 rescue 姿势，捕获明确指定的异常，rescue OneError => e</li>
+<li>次好的 rescue 姿势，捕获 StandardError，通过 rescue 或 rescue => e</li>
+<li><strong>千万千万不要</strong> rescue Exception => e，除非真的知道自己在干嘛</li>
+<li>自己定义的异常应该继承自 StandardError ，而不是 Exception。</li>
+</ol>
+
 
 <p>end.</p>
 ]]></content>
@@ -170,7 +172,7 @@ when 3..5
   puts "in 3..5"
 when Symbol
   puts "It is a symbol"
-else 
+else
   puts "unkonwn"
 </code></pre>
 
